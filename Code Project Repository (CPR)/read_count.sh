@@ -44,9 +44,10 @@ case $response in
 	;;
 	N|n|[Nn]o)
 	    echo "Ensembl annotation GTF file will be downloaded"
-	  	echo "Downloading B napus latest annnotation GFF file"
+	  	echo "Downloading B napus ensembl plants annnotation GFF file"
 	  	wget https://ftp.ensemblgenomes.ebi.ac.uk/pub/plants/release-56/gff3/brassica_napus/Brassica_napus.AST_PRJEB5043_v1.56.gff3.gz
 	  	gzip -d Brassica_napus.AST_PRJEB5043_v1.56.gff3.gz
+	  	echo "Converting GFF3 file to GTF3"
 	  	agat_convert_sp_gff2gtf.pl --gff Brassica_napus.AST_PRJEB5043_v1.56.gff3.gz -o genome.gtf
 
 		#wget https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/3708/102/GCF_020379485.1_Da-Ae/GCF_020379485.1_Da-Ae_genomic.gtf.gz
