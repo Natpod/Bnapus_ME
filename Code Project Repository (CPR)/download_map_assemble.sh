@@ -24,10 +24,10 @@ then
 		
 		else
 			echo "No clean read files found. \nExiting..."
-			exit(1)
+			exit 1
 	else
 		echo "Clean reads directory is empty. Try again with a proper dir"
-	exit(1)
+	exit 1
 fi
 
 # ----------
