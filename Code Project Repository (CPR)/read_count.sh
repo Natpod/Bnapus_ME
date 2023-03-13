@@ -22,13 +22,13 @@ then
 	
 	else
 		echo "No bam files found. \nExiting..."
-		exit(1)
+		exit 1
 
 	fi
 
 else
 	echo "Bam file directory is empty. Try again with a proper dir. \nExiting..."
-	exit(1)
+	exit 1
 
 fi
 
@@ -45,14 +45,14 @@ case $response in
 	N|n|[Nn]o)
 	    echo "Latest annotation GTF file will be downloaded"
 	  	echo "Downloading B napus latest annnotation GFF file"
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/3708/102/GCF_020379485.1_Da-Ae/GCF_020379485.1_Da-Ae_genomic.gtf.gz
-		gzip -d GCF_020379485.1_Da-Ae_genomic.gtf.gz
-		mv GCF_020379485.1_Da-Ae_genomic.gtf.gz genome.gtf
+		#wget https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/3708/102/GCF_020379485.1_Da-Ae/GCF_020379485.1_Da-Ae_genomic.gtf.gz
+		#gzip -d GCF_020379485.1_Da-Ae_genomic.gtf.gz
+		#mv GCF_020379485.1_Da-Ae_genomic.gtf.gz genome.gtf
 		path_to_genome=$(pwd)"/genome.gtf"
 	;;
 	  *)
 	    echo "Irrelevant response. Exitting"
-	    exit(0)
+	    exit 0
 	;;
 	esac
 
