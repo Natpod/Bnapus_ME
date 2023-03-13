@@ -1,15 +1,19 @@
 #!/bin/bash
 
-# Download latest assemblies and GTF annotations into directory of choice
+# Download ensembl assembly into directory of choice and create hisat2 mapping
 # Author : Natalia García Sánchez
 # Date : 24/02/2023
 # --- 
 
-# Download reference genome latest assembly in fasta format
-echo "Downloading B napus latest assembly"
-wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/020/379/485/GCF_020379485.1_Da-Ae/GCF_020379485.1_Da-Ae_genomic.fna.gz
+# Download reference genome ensembl assembly in fasta format
+echo "Downloading B napus ensembl assembly"
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/751/015/GCA_000751015.1_AST_PRJEB5043_v1/GCA_000751015.1_AST_PRJEB5043_v1_genomic.fna.gz
 gzip -d GCF_020379485.1_Da-Ae_genomic.fna.gz
-mv GCF_020379485.1_Da-Ae_genomic.fna genome.fa
+mv GCA_000751015.1_AST_PRJEB5043_v1_genomic.fna.gz genome.fa
+
+#wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/020/379/485/GCF_020379485.1_Da-Ae/GCF_020379485.1_Da-Ae_genomic.fna.gz
+#gzip -d GCF_020379485.1_Da-Ae_genomic.fna.gz
+#mv GCF_020379485.1_Da-Ae_genomic.fna genome.fa
 
 # Checking read data 
 echo "Enter clean read data directory path : \n>"
@@ -32,13 +36,10 @@ fi
 
 # ----------
 
-# Mapping - loading conda environment
-
-conda source activate
+# Mapping 
 
 # -- Creating genome index wit BW comp algorithm: This will create a series of indexing files needed
 
-conda activate TFM
 bwa index genome.fa
 
 # -- Mapping to index genome and converting formats

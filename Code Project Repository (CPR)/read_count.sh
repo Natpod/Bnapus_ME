@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Description: Creating count files of undirected sequenced library
+# Description: Sorting and reporting bam, creating count files of undirected sequenced library
 # Author : Natalia García Sánchez
 # Date : 24/02/2023
 # ---
@@ -43,15 +43,19 @@ case $response in
 		read path_to_genome
 	;;
 	N|n|[Nn]o)
-	    echo "Latest annotation GTF file will be downloaded"
+	    echo "Ensembl annotation GTF file will be downloaded"
 	  	echo "Downloading B napus latest annnotation GFF file"
+	  	wget https://ftp.ensemblgenomes.ebi.ac.uk/pub/plants/release-56/gff3/brassica_napus/Brassica_napus.AST_PRJEB5043_v1.56.gff3.gz
+	  	gzip -d Brassica_napus.AST_PRJEB5043_v1.56.gff3.gz
+	  	agat_convert_sp_gff2gtf.pl --gff Brassica_napus.AST_PRJEB5043_v1.56.gff3.gz -o genome.gtf
+
 		#wget https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/3708/102/GCF_020379485.1_Da-Ae/GCF_020379485.1_Da-Ae_genomic.gtf.gz
 		#gzip -d GCF_020379485.1_Da-Ae_genomic.gtf.gz
 		#mv GCF_020379485.1_Da-Ae_genomic.gtf.gz genome.gtf
 		path_to_genome=$(pwd)"/genome.gtf"
 	;;
 	  *)
-	    echo "Irrelevant response. Exitting"
+	    echo "Irrelevant response. Exiting"
 	    exit 0
 	;;
 	esac
@@ -91,6 +95,7 @@ for file in flagstat_reports/*.flagstat_report.txt; do
 	join flagstat_reports/flagstat_report flagstat_reports/tmp_file; 
 
 	done
+
 rm flagstat_reports/*.flagstat_report.txt
 
 
@@ -99,14 +104,9 @@ printf "MAPPING\t" >flagstat_reports/flagstat_report
 echo "$(ls flagstat_reports/*flagstat_report*.txt)" | tr "\n" "\t" >>flagstat_reports/flagstat_report
 
 
-
 # INDEXING FILES PRE-READ COUNT
 
 for file in $path_to_bam_files/*.bam; do samtools index $file; done
-
-conda deactivate
-conda source activate
-conda activate __
 
 # --- Performing htseq count for genes
 
@@ -115,22 +115,3 @@ do
 	htseq-count -i gene_id -s no -r pos -f bam $file $path_to_genome -m union -t exon >${file%.bam}".counts"; 
 
 done
-
-
-# --- Joining all counts
-
-# Printing first part of the header
-printf "Gene\t" >merged.counts.tsv
-
-# Getting the rest of the header and sample order
-for file in *.counts; 
-do 
-	printf %s "$file" >>merged.counts.tsv
-	printf "\t" >>merged.counts.tsv
-done
-fileorder=($(ls *.counts))
-
-# joining the contents of the count files one by one in order
-join -t "$(echo -e "\t")" ${fileorder[0]} ${fileorder[1]} | join -t
-"$(echo -e "\t")" - ${fileorder[2]}| join -t "$(echo -e "\t")" -
-${fileorder[3]} >>merged.counts.tsv
