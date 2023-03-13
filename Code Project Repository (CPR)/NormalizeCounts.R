@@ -8,7 +8,7 @@
 
 
 # Print usage message
-writeLines(sprintf("\n NormalizeCounts.R \n script usage: \n TPMcalc.R mergedcountsfile \n ---"))
+writeLines(sprintf("\n NormalizeCounts.R \n script usage: \n NormalizeCounts.R mergedcountsfile \n ---"))
 
 
 args = commandArgs(trailingOnly = TRUE)
