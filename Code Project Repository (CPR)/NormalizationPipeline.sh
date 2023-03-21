@@ -108,7 +108,8 @@ normcounts(){
 	# Output : normalized merged counts csv table in working directory
 
 	echo -e '\n\t4) Normalizing merged gene counts...'
-	Rscript "NormalizeCounts.R" "$1" "$2" "$3"
+	Rscript "NormalizeCounts.R" "$1/merged/merged.counts" "$2" "$3"
+	mv "$3"_values.csv "$1"
 }
 
 
@@ -121,7 +122,7 @@ main() {
 	firstchecks "$@"
 	joincounts "$1"	
 	calculatelengths "$2"
-	normcounts "$1/merged/merged.counts" "length_genes.csv" "$3"
+	normcounts "$1" "length_genes.csv" "$3"
 
 	# Remove tmp files
 	rm "length_genes.csv"
