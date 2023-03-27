@@ -1,0 +1,108 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+install.packages('stringdb')
+```
+```{r}
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("STRINGdb")
+library('igraph')
+```
+
+
+```{r}
+library('STRINGdb')
+library('igraph')
+```
+
+
+```{r}
+string_db <- STRINGdb$new( version="11.5", species=3708,
+score_threshold=200, network_type="full", input_directory="")
+df_sbs=read.csv("C:\\Users\\naata\\MASTER\\biostruct\\stringdb\\Filtered_DEGs_mappings_string.csv")
+
+```
+```{r}
+DEGres<-read.csv("C:\\Users\\naata\\MASTER\\biostruct\\stringdb\\Filtered_DEG_LFC1_padj05_results_total.csv")
+DEGres
+```
+
+```{r}
+lfc4res=merge(df_sbs,DEGres, by.x='gene_id',by.y='gene_id')
+nrow(lfc4res)
+```
+```{r}
+library('dplyr')
+lfc4res <- lfc4res %>%
+  mutate(log2FoldChange.abs <- abs(log2FoldChange))
+
+filtered_lfc4=lfc4res[lfc4res$log2FoldChange.abs > 4, ]
+sprintf('genes with STRINGdb mapping and LFC>4 : %s',nrow(filtered_lfc4))
+string_ids=filtered_lfc4$stringdb_id
+```
+
+
+
+
+```{r}
+string_ids_all=lfc4res$stringdb_id
+interactions = string_db$get_interactions(string_ids_all)
+#write.csv(interactions, "C:\\Users\\naata\\MASTER\\biostruct\\stringdb\\PPI_network.csv")
+filterppi = unique(c(interactions$from, interactions$to))
+```
+
+
+```{r}
+Bn_ppi_enrichment = string_db$get_enrichment(string_ids)
+Bn_ppi_enrichment
+```
+
+
+```{r}
+###################################################
+#getOption("SweaveHooks")[["fig"]]()
+svg("C:\\Users\\naata\\MASTER\\biostruct\\stringdb\\plot_PPI_LFC4_high_confidence.svg")
+sting_ids_plot=string_ids[string_ids %in% filterppi]
+string_db$plot_network( sting_ids_plot, required_score=900 )
+dev.off()
+```
+
+Get all values from ordered dataframe by LFC values and plot the resulting network
+```{r}
+sorted_lfc4 <- lfc4res[order(-lfc4res$log2FoldChange.abs), ]
+string_ids_plot<-sorted_lfc4$stringdb_id
+```
+
+```{r}
+###################################################
+svg("C:\\Users\\naata\\MASTER\\biostruct\\stringdb\\plot_PPI_high_confidence_all.svg")
+#string_ids_plot=string_ids_plot[string_ids_plot %in% filterppi]
+#string_ids_plot=string_ids_plot[1:2000]
+string_db$plot_network( string_ids_plot, required_score = 900 )
+dev.off()
+```
+
+```{r}
+Bn_PPI_enrichment<- string_db$ppi_enrichment(string_ids)
+```
+```{r}
+Bn_PPI_enrichment
+```
+```{r}
+string_db$enrichment_heatmap(string_ids)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
