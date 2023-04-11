@@ -117,7 +117,7 @@ echo -e "\n${RED}Enter the directory where your want to decompress your raw read
 read path_to_draw_reads
 check_Odir_exists "$path_to_draw_reads"
 
-echo -e "\n${RED}Enter the directory where you want your Quality Check (QC) files to be found${NC}"
+echo -e "\n${RED}Enter the directory where you want your Quality Check (QC) files and trimming reports to be found${NC}"
 read path_to_fq
 check_Odir_exists "$path_to_fq"
 
@@ -131,7 +131,7 @@ if [ -d "$path_to_fq" ]; then rm -r "$path_to_fq"; fi
 mkdir "$path_to_fq"
 mkdir "$path_to_fq"/pre_filter_fastqc
 mkdir "$path_to_fq"/post_filter_fastqc
-
+mkdir "$path_to_fq"/trimmingreport
 
 # QC AND TRIMMING
 
@@ -181,7 +181,7 @@ for (( samplenum=1; samplenum<="$numbers"; samplenum++ ));
 
 					# Making fastqc reports of each read file
 					
-					fastqc "$file" -o "$path_to_fq"/pre_filter_fastqc
+					# fastqc "$file" -o "$path_to_fq"/pre_filter_fastqc
 
 					# Decompress reads per sample and condition
 					
@@ -196,12 +196,14 @@ for (( samplenum=1; samplenum<="$numbers"; samplenum++ ));
 				echo -e "\n\nBUGGGGGGG\n"
  
 				# Trimming files per sample and condition
-				fastp -m --include_unmerged --adapter_fasta "$path_to_adapters" \
+				fastp -m --adapter_fasta "$path_to_adapters" \
 				-i "$path_to_draw_reads"/"$condition"rep"$samplenum"_1.fq \
 				-I "$path_to_draw_reads"/"$condition"rep"$samplenum"_2.fq \
 				-o "$path_to_clean_reads"/"$condition"rep"$samplenum"_1.trimmed.fq \
 				-O "$path_to_clean_reads"/"$condition"rep"$samplenum"_2.trimmed.fq \
-				-n 15 -q 5 -u 50 -l 150
+				-n 15 -q 5 -u 50 -l 150 \
+				-j "$path_to_fq"/trimmingreport/HDAC_trimrep.json \
+				-h "$path_to_fq"/trimmingreport/HDAC_trimrep.html
 
 					
 		
@@ -215,6 +217,6 @@ echo -e "\n-----------------------------------------\n4) Performing final QC of 
 		
 fastqc "$path_to_clean_reads"/*.fq -o "$path_to_fq"/post_filter_fastqc
 
-multiqc "$path_to_fq"/post_filter_fastqc/*.zip
+multiqc "$path_to_fq"/post_filter_fastqc/*.zip 2>"$path_to_fq"/post_filter_fastqc
 
-multiqc "$path_to_fq"/pre_filter_fastqc/*.zip
+multiqc "$path_to_fq"/pre_filter_fastqc/*.zip 2>"$path_to_fq"/pre_filter_fastqc
