@@ -1,0 +1,25 @@
+[2023-04-11 11:02:34,016] multiqc                                            [DEBUG  ]  This is MultiQC v1.14
+[2023-04-11 11:02:34,016] multiqc                                            [DEBUG  ]  Command used: /home/famgarcia/anaconda3/bin/multiqc ../../../HDAC_QC/pre_filter_fastqc/Crep_*_fastqc.zip ../../../HDAC_QC/pre_filter_fastqc/Trep_*_fastqc.zip
+[2023-04-11 11:02:34,851] multiqc                                            [DEBUG  ]  Latest MultiQC version is v1.14
+[2023-04-11 11:02:34,852] multiqc                                            [DEBUG  ]  Working dir : /home/famgarcia/Bnapus_ME/Code Project Repository (CPR)/RNAseq_pipeline_first_steps
+[2023-04-11 11:02:34,852] multiqc                                            [DEBUG  ]  Template    : default
+[2023-04-11 11:02:34,852] multiqc                                            [DEBUG  ]  Running Python 3.9.12 (main, Apr  5 2022, 06:56:58)  [GCC 7.5.0]
+[2023-04-11 11:02:34,852] multiqc                                            [DEBUG  ]  Analysing modules: custom_content, ccs, ngsderive, purple, conpair, lima, peddy, somalier, methylQA, mosdepth, phantompeakqualtools, qualimap, preseq, hifiasm, quast, qorts, rna_seqc, rockhopper, rsem, rseqc, busco, bustools, goleft_indexcov, gffcompare, disambiguate, supernova, deeptools, sargasso, verifybamid, mirtrace, happy, mirtop, sambamba, gopeaks, homer, hops, macs2, theta2, snpeff, gatk, htseq, bcftools, featureCounts, fgbio, dragen, dragen_fastqc, dedup, pbmarkdup, damageprofiler, biobambam2, jcvi, mtnucratio, picard, vep, sentieon, prokka, qc3C, nanostat, samblaster, samtools, sexdeterrmine, eigenstratdatabasetools, bamtools, jellyfish, vcftools, longranger, stacks, varscan2, snippy, umitools, bbmap, bismark, biscuit, diamond, hicexplorer, hicup, hicpro, salmon, kallisto, slamdunk, star, hisat2, tophat, bowtie2, bowtie1, cellranger, snpsplit, odgi, pangolin, nextclade, humid, kat, leehom, adapterRemoval, bbduk, clipandmerge, cutadapt, flexbar, kaiju, kraken, malt, motus, trimmomatic, sickle, skewer, sortmerna, biobloomtools, fastq_screen, afterqc, fastp, fastqc, filtlong, prinseqplusplus, pychopper, porechop, pycoqc, minionqc, anglerfish, multivcfanalyzer, clusterflow, checkqc, bcl2fastq, bclconvert, interop, ivar, flash, seqyclean, optitype, whatshap
+[2023-04-11 11:02:34,853] multiqc                                            [DEBUG  ]  Using temporary directory for creating report: /tmp/tmp4xuaip_p
+[2023-04-11 11:02:35,383] multiqc                                            [INFO   ]  Search path : /home/famgarcia/HDAC_QC/pre_filter_fastqc/Crep_*_fastqc.zip
+[2023-04-11 11:02:35,383] multiqc                                            [INFO   ]  Search path : /home/famgarcia/HDAC_QC/pre_filter_fastqc/Trep_*_fastqc.zip
+[2023-04-11 11:02:35,440] multiqc                                            [DEBUG  ]  Summary of files that were skipped by the search: []
+[2023-04-11 11:02:38,212] multiqc.plots.bargraph                             [DEBUG  ]  Using matplotlib version 3.5.1
+[2023-04-11 11:02:38,223] multiqc.plots.linegraph                            [DEBUG  ]  Using matplotlib version 3.5.1
+[2023-04-11 11:02:38,225] multiqc                                            [DEBUG  ]  No samples found: custom_content
+[2023-04-11 11:02:38,269] multiqc.modules.fastqc.fastqc                      [INFO   ]  Found 2 reports
+[2023-04-11 11:02:38,270] multiqc.modules.fastqc.fastqc                      [WARNING]  Sample had zero reads: 'Crep_*'
+[2023-04-11 11:02:38,270] multiqc.modules.fastqc.fastqc                      [WARNING]  Sample had zero reads: 'Trep_*'
+[2023-04-11 11:02:38,284] multiqc.modules.fastqc.fastqc                      [DEBUG  ]  sequence_quality not found in FastQC reports
+[2023-04-11 11:02:38,284] multiqc.modules.fastqc.fastqc                      [DEBUG  ]  per_seq_quality not found in FastQC reports
+[2023-04-11 11:02:38,311] multiqc.modules.fastqc.fastqc                      [DEBUG  ]  adapter_content not found in FastQC reports
+[2023-04-11 11:02:38,361] multiqc                                            [INFO   ]  Compressing plot data
+[2023-04-11 11:02:38,386] multiqc                                            [INFO   ]  Report      : multiqc_report.html
+[2023-04-11 11:02:38,386] multiqc                                            [INFO   ]  Data        : multiqc_data
+[2023-04-11 11:02:38,386] multiqc                                            [DEBUG  ]  Moving data file from '/tmp/tmp4xuaip_p/multiqc_data' to '/home/famgarcia/Bnapus_ME/Code Project Repository (CPR)/RNAseq_pipeline_first_steps/multiqc_data'
+[2023-04-11 11:02:38,588] multiqc                                            [INFO   ]  MultiQC complete
