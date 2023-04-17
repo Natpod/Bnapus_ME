@@ -137,6 +137,7 @@ mkdir "$path_to_fq"/trimmingreport
 
 
 # Building an array that establishes the conditions of the experiment ('Control':'C', 'Treatment-DHDAC' : 'T')
+
 array_conditions=('C' 'T')
 
 
@@ -155,48 +156,29 @@ for (( samplenum=1; samplenum<="$numbers"; samplenum++ ));
 		for condition in "${array_conditions[@]}";
 		do 
 			
-
+			echo -e "\nDecompressing PE files in sample number $samplenum in $condition read files\n"; 
+					
 			# Find Forward and Reverse sequence files names, put them in a temporary array
-
-			filebatch=( )
-			ls -A "$path_to_raw_reads"/"$condition"rep"$samplenum"_* | while IFS= read -r line
-				do
-					echo -e "saving file $line\n"
-					filebatch+=( "$line" )
-				#done
-
-
-
 			# Decompress Forward and Reverse sequence files per sample and condition
 
-			#for file in "${filebatch[@]}";
-				#do
-
-				file="$line"
-
-					echo -e "\nDecompressing sample number $samplenum in $condition read files\n"; 
-			
-					echo "$file"
-					tfilename=$(basename "$file")
-
-					# Making fastqc reports of each read file
-					
-					# fastqc "$file" -o "$path_to_fq"/pre_filter_fastqc
+			ls -A "$path_to_raw_reads"/"$condition"rep"$samplenum"_* | while IFS= read -r line
+				do
 
 					# Decompress reads per sample and condition
 					
+					file="$line"
+					tfilename=$(basename "$file")
 					dfile="${tfilename%.fq.gz}".fq
 
-					
+					echo "Decompressing sample name : $file"
 					gzip -dkc "$file" >"$path_to_draw_reads"/"$dfile"
 
 
 				done
 
-				echo -e "\n\nBUGGGGGGG\n"
  
 				# Trimming files per sample and condition
-				fastp -m --adapter_fasta "$path_to_adapters" \
+				fastp --adapter_fasta "$path_to_adapters" \
 				-i "$path_to_draw_reads"/"$condition"rep"$samplenum"_1.fq \
 				-I "$path_to_draw_reads"/"$condition"rep"$samplenum"_2.fq \
 				-o "$path_to_clean_reads"/"$condition"rep"$samplenum"_1.trimmed.fq \
@@ -215,8 +197,7 @@ for (( samplenum=1; samplenum<="$numbers"; samplenum++ ));
 # Making fastqc reports of each read file
 echo -e "\n-----------------------------------------\n4) Performing final QC of clean files\n-----------------------------------------\n"
 		
-fastqc "$path_to_clean_reads"/*.fq -o "$path_to_fq"/post_filter_fastqc
+fastqc "$path_to_clean_reads"/*.trimmed.fq -o "$path_to_fq"/post_filter_fastqc
 
 multiqc "$path_to_fq"/post_filter_fastqc/*.zip 2>"$path_to_fq"/post_filter_fastqc
 
-multiqc "$path_to_fq"/pre_filter_fastqc/*.zip 2>"$path_to_fq"/pre_filter_fastqc

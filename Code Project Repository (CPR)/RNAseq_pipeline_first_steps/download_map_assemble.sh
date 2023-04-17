@@ -5,6 +5,12 @@
 # Date : 24/02/2023
 # --- 
 
+module load GCCcore/10.2.0
+module load Perl/5.32.0-GCCcore-10.2.0-minimal
+module load gzip/1.10-GCCcore-8.2.0
+HTSeq/0.11.1-foss-2019a
+module load HISAT2/2.1.0-foss-2019a
+
 
 # Download reference genome ensembl assembly in fasta format
 
