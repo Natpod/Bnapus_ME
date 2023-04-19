@@ -7,12 +7,12 @@
 
 
 help(){
-	echo -e "${GREEN}\n~~~~~~~~ create_rnk_file.sh ~~~~~~~~~~~\n\tUsage:${NC} create_rnk_file.sh${GREEN} <DeSeq2_wth_external_gene_name_and_stat_output.csv> ${NC}"
+	echo -e "${GREEN}\n~~~~~~~~ create_rnk_file.sh ~~~~~~~~~~~\n\tUsage:${NC} create_rnk_file.sh${GREEN} <DeSeq2_wth_external_gene_name_and_stat_output.csv> <external_gene_name_colnum_in_csv> <stat_colnum_in_csv>${NC}"
 	exit 1
 }
 
 check_DE_file_exists(){
-if [ -z "$1" ]; 
+if [ -f "$1" ]; 
 	then 
 		echo "Processing DeSeq2 Output file..."
 	else 
@@ -24,8 +24,7 @@ if [ -z "$1" ];
 main(){
 
 check_DE_file_exists "$1"
-cat "$1"| sed 's/\"//g' | awk -v I="$ID" -v P="$P" 'FS = "," {print $I"\t"$P}' \
-| awk '$1!="NA" && $2!="NA"' | sort -k2gr   >bna_HDAC_deseq2stat.rnk
+cat "$1" | awk -v I="$ID" -v P="$P" 'FS = "," {print $I","$P}' | awk '$1!="NA" && $2!="NA"' | sed 's/\"//g' | sort -t, -k2gr   >bna_HDAC_deseq2stat.rnk
 
 }
 
@@ -38,5 +37,6 @@ NC='\033[0m'
 ID=$2
 #Specify the DeSeq2 wald stat "stat" column num
 P=$3
+
 main "$1" "$2" "$3"
 
