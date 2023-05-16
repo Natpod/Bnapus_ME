@@ -1,0 +1,276 @@
+---
+title: "GSEA_v2"
+author: "Natalia García"
+date: '2023-05-16'
+output: html_document
+---
+In this script we will
+
+* Preprocess Gene Ontology (GO) gene set - "external gene name" (European Nucleoide Archive identifiers) annotations retrieved from BiomaRt API programmatic access - Ensembl Plants release 56 - _Brassica napus_ genome + labelled GO _Arabidopsis thaliana_  annotations from Reciprocal orthologous gene pairs Compara API in a set of selected categories of interest (See Annex I of Master thesis for more details ). Annotations are intended to be more comprehensive and specific than `PANTHERdb` or `PlantGSAD`, and Ensembl transcript centric contrary to those available in NCBI AnnotationHub R package.
+
+* Conduct a FCS Gene Enrichment Analysis (GSEA) using the preranked GSEA algorithm with the package `genekitr`. 
+
+# Loading libraries
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages(library("pathview"))
+suppressPackageStartupMessages(library("readxl"))
+suppressPackageStartupMessages(library("clusterProfiler"))
+suppressPackageStartupMessages(library("Rgraphviz"))
+suppressPackageStartupMessages(library("graph"))
+library(tidyverse)
+library(geneset)
+library(genekitr)
+library(data.table)
+suppressPackageStartupMessages(library("KEGGgraph"))
+suppressWarnings(suppressPackageStartupMessages(library("fgsea")))
+```
+
+# Loading data
+
+A collection of gene - DeSeq2 Wald statistic pair values is used in a `.rnk` file, sorted by the latter statistic representing gene expression levels
+
+(Enter wald statistic formula : (/Zscore))
+
+```{r cars}
+ranks_HDAC <- read.csv("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\bna_HDAC_deseq2stat.rnk",
+                    header=FALSE, colClasses = c("character", "numeric"))
+
+
+ranks_Stress <- read.csv("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\bna_MVvsPE_deseq2stat.rnk",
+                    header=FALSE, colClasses = c("character", "numeric"))
+
+# We'll extract the background genes - the genes detected with over log10(counts)>1
+
+background_ALL_gl_HDAC <- ranks_HDAC[,1]
+background_ALL_gl_Stress <- ranks_Stress[,1]
+
+background_UP_gl_HDAC <- ranks_HDAC[which(ranks_HDAC[,2] > 0), 1]
+background_UP_gl_Stress <- ranks_Stress[which(ranks_Stress[,2] > 0), 1]
+
+background_DOWN_gl_HDAC <- ranks_HDAC[which(ranks_HDAC[,2] < 0), 1]
+background_DOWN_gl_Stress <- ranks_Stress[which(ranks_Stress[,2] < 0), 1]
+
+```
+
+## Preprocessing data
+
+```{r pressure, echo=FALSE}
+
+
+# Remove duplicates (transcript isoform with more differential expression will be conserved from the same gene)
+ranks_HDAC <- ranks_HDAC[!duplicated(ranks_HDAC[,1]),]
+ranks_Stress <- ranks_Stress[!duplicated(ranks_Stress[,1]),]
+
+# Labelling columns (gene_name "ID" and statistic "t")
+colnames(ranks_HDAC) <-c("ID","t")
+colnames(ranks_Stress) <-c("ID","t")
+
+# Sorting and creating ordered gene ranks column
+ranks_HDAC <- ranks_HDAC %>% mutate(rank = rank(t,  ties.method = "random"))
+ranks_HDAC <- ranks_HDAC[order(ranks_HDAC$rank, decreasing=TRUE), ]
+
+ranks_Stress <- ranks_Stress %>% mutate(rank = rank(t,  ties.method = "random"))
+ranks_Stress <- ranks_Stress[order(ranks_Stress$rank, decreasing=TRUE), ]
+
+# Converting to set of lists
+ranks_HDAC <- setNames(ranks_HDAC$t, ranks_HDAC$ID)
+ranks_Stress <- setNames(ranks_Stress$t, ranks_Stress$ID)
+
+
+```
+
+
+# Loading pathways and background gene set
+
+```{r}
+# Background gene set with detected gene expression - Used in Overrepresentation analysis
+disreg_genes<-read_table("C:\\Users\\naata\\MASTER\\Enrichment\\Filtered_DEG_LFC1_padj05_results_total.xlsx")
+
+# Biomart access - get mappings, and disreg gene list (UP, DOWN, ALL)
+
+```
+
+
+# Loading gene set categories obtained in "get_gs_homolog_gs.Rmd"
+```{r}
+
+# Biological Process
+
+pathways_BP_gs <-read.csv('C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_genesets.csv')
+pathways_MF_gs <-read.csv('C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_genesets.csv')
+pathways_CC_gs <-read.csv('C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_genesets.csv')
+
+pathways_BP_terms <-read.csv('C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_terms.csv')
+pathways_MF_terms <-read.csv('C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_terms.csv')
+pathways_CC_terms <-read.csv('C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_terms.csv')
+
+```
+
+# Biological process GSEA
+
+```{r}
+library("clusterProfiler")
+library(stringr)
+
+attr<- c("ID","Description","setSize","enrichmentScore","NES","pvalue","p.adjust","qvalue","rank","leading_edge","geneID", "geneID_symbol", "Count","GeneRatio")
+
+gsea_HDAC_o <- clusterProfiler::GSEA(geneList = ranks_HDAC, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = pathways_BP_gs, TERM2NAME = pathways_BP_terms, seed=TRUE, by="fgsea")
+gsea_HDAC<-gsea_HDAC_o[,1:11]
+
+gsea_Stress_o <- clusterProfiler::GSEA(geneList = ranks_Stress, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = pathways_BP_gs, TERM2NAME = pathways_BP_terms, seed=TRUE, by="fgsea")
+gsea_Stress<-gsea_Stress_o[,1:11]
+
+count_HDAC <- c()
+gsea_HDAC$geneID_symbol = gsea_HDAC$core_enrichment
+for (x in gsea_HDAC$core_enrichment){count_HDAC<-c(count_HDAC, as.numeric(str_count(x, "/")+1))}
+gsea_HDAC$Count <- count_HDAC
+gsea_HDAC$GeneRatio <- gsea_HDAC$Count/gsea_HDAC$setSize
+names(gsea_HDAC) <- attr
+
+count_Stress <- c()
+gsea_Stress$geneID_symbol = gsea_Stress$core_enrichment
+for (x in gsea_Stress$core_enrichment){count_Stress<-c(count_Stress, as.numeric(str_count(x, "/")+1))}
+gsea_Stress$Count <- count_Stress
+gsea_Stress$GeneRatio <- gsea_Stress$Count/gsea_Stress$setSize
+names(gsea_Stress) <- attr
+
+
+```
+
+Preprocessing genekitr for plotting
+
+```{r}
+
+# LFC
+
+lfc_val_HDAC <- read.csv("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\bna_HDAC_deseq2stat.rnk",
+                    header=FALSE, colClasses = c("character", "numeric"))
+lfc_val_Stress <- read.csv("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\bna_MVvsPE_deseq2stat.rnk",
+                    header=FALSE, colClasses = c("character", "numeric"))
+
+colnames(lfc_val_HDAC) <- c("ID", "logfc")
+colnames(lfc_val_Stress) <- c("ID", "logfc")
+
+# METADATA
+
+org_df <- data.frame(org="bnapus")
+exp_df <- data.frame(exponent=1)
+
+# GSEA result
+
+gsea_HDAC_gkit <- as.enrichdat(gsea_HDAC[1:11])
+gsea_Stress_gkit <- as.enrichdat(gsea_Stress[1:11])
+
+BP_HDAC_list = list()
+BP_HDAC_list[['gsea_df']] <- gsea_HDAC
+BP_HDAC_list[['genelist']] <- lfc_val_HDAC
+BP_HDAC_list[['geneset']] <- pathways_BP_gs[!(pathways_BP_gs[,1] %in% c(child_s_go[,1],parent_s_go[,1])),]
+BP_HDAC_list[['exponent']] <- exp_df
+BP_HDAC_list[['org']] <- org_df
+
+
+BP_Stress_list = list()
+BP_Stress_list[['gsea_df']] <- gsea_Stress
+BP_Stress_list[['genelist']] <- lfc_val_Stress
+BP_Stress_list[['geneset']] <- pathways_BP_gs[!(pathways_BP_gs[,1] %in% c(child_s_go[,1],parent_s_go[,1])),]
+BP_Stress_list[['exponent']] <- exp_df
+BP_Stress_list[['org']] <- org_df
+
+```
+
+# LOAD genesets of interest from Excel file
+```{r}
+child_s_go <- read_excel("C:\\Users\\naata\\Documents\\MASTER\\TFM\\tfm\\GO_to_lookup_homologuesAt.xlsx", sheet="CHILD_TERMS_ALL")
+
+parent_s_go <- read_excel("C:\\Users\\naata\\Documents\\MASTER\\TFM\\tfm\\GO_to_lookup_homologuesAt.xlsx", sheet="MAIN_TERMS")
+
+colnames(child_s_go) <- c("ID", "name", "parent")
+colnames(parent_s_go) <- c("ID", "name")
+
+
+write.xlsx(BP_HDAC_list, "C://Users//naata//Desktop//reprex_plotGSEA.xlsx")
+```
+
+
+```{r}
+# merge gsea_Results GO + child/parent terms
+pathways = as.data.frame(gsea_HDAC[which(gsea_HDAC[,1] %in% parent_s_go[,1]$ID),1])
+colnames(pathways)="ID"
+genekitr::plotGSEA(BP_HDAC_list, plot_type = "classic")
+
+# Error replacement calcscore(geneset genelist, pathway, exponent, fortify=TRUE)
+# see docs
+# or 
+# keep preprocessing data?
+```
+```{r}
+genekitr::plotGSEA(BP_HDAC_list, plot_type = "classic", show_pathway = "GO:0040029")
+```
+
+
+# OVERREPRESENTATION ANALYSIS
+
+# Import results from DeSeq2 analysis
+```{r}
+DEG_HDAC<-read_excel("C:\\Users\\naata\\MASTER\\Enrichment\\Filtered_DEG_LFC1_padj05_results_total.xlsx")
+DEG_Stress <-read_csv("C:\\Users\\naata\\MASTER\\Enrichment\\Final_condition_PErep_vs_VMrep_padj0.05_woPErep3_LFC1filtered.csv")
+
+DEG_ALL_HDAC <- DEG_HDAC$external_gene_name
+DEG_ALL_Stress <- DEG_Stress$external_gene_name
+
+DEG_UP_HDAC <- DEG_HDAC[which(DEG_HDAC$log2FoldChange > 0),]$external_gene_name
+DEG_UP_Stress <- DEG_Stress[which(DEG_Stress$log2FoldChange > 0),]$external_gene_name
+
+
+DEG_DOWN_HDAC <- DEG_HDAC[which(DEG_HDAC$log2FoldChange < 0),]$external_gene_name
+DEG_DOWN_Stress <- DEG_Stress[which(DEG_Stress$log2FoldChange < 0),]$external_gene_name
+
+```
+
+# All genes
+```{r}
+# Get background genes : genes with detected minimal expression
+colnames(background_ALL_gl_HDAC) = "gene"
+bckgr_geneset_HDAC <- merge(background_ALL_gl_HDAC, pathways_BP_gs, by="gene")
+
+colnames(background_ALL_gl_Stress) = "gene"
+bckgr_geneset_Stress <- merge(background_ALL_gl_Stress, pathways_BP_gs, by="gene")
+
+ORA_HDAC_ALL <- clusterProfiler::enricher(geneList = DEG_ALL_HDAC, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_BP_terms, seed=TRUE, by="fgsea")
+ORA_Stress <- clusterProfiler::enricher(geneList = DEG_ALL_Stress, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_BP_terms, seed=TRUE, by="fgsea")
+
+
+```
+
+# Up-regulated genes
+
+```{r}
+library("clusterProfiler")
+colnames(background_ALL_gl_HDAC) = "gene"
+bckgr_geneset_HDAC <- merge(background_UP_gl_HDAC, pathways_BP_gs, by="gene")
+
+colnames(background_ALL_gl_Stress) = "gene"
+bckgr_geneset_Stress <- merge(background_UP_gl_Stress, pathways_BP_gs, by="gene")
+
+ORA_HDAC_ALL <- clusterProfiler::enricher(geneList = DEG_UP_HDAC, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_BP_terms, seed=TRUE, by="fgsea")
+ORA_Stress <- clusterProfiler::enricher(geneList = DEG_UP_Stress, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_BP_terms, seed=TRUE, by="fgsea")
+
+
+```
+
+# Down-regulated genes
+
+```{r}
+library("clusterProfiler")
+colnames(background_ALL_gl_HDAC) = "gene"
+bckgr_geneset_HDAC <- merge(background_DOWN_gl_HDAC, pathways_BP_gs, by="gene")
+
+colnames(background_ALL_gl_Stress) = "gene"
+bckgr_geneset_Stress <- merge(background_DOWN_gl_Stress, pathways_BP_gs, by="gene")
+
+ORA_HDAC_ALL <- clusterProfiler::enricher(geneList = DEG_DOWN_HDAC, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_BP_terms, seed=TRUE, by="fgsea")
+ORA_Stress <- clusterProfiler::enricher(geneList = DEG_DOWN_Stress, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_BP_terms, seed=TRUE, by="fgsea")
+
+
+```
