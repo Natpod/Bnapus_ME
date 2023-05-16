@@ -1,0 +1,486 @@
+---
+title: "Visualizations_Enrichment_ORA"
+author: "Natalia García"
+date: '2023-04-25'
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+#install.packages("stringi")
+#library("biomartr")
+library("multienrichjam")
+library("clusterProfiler")
+library("tidyverse")
+library("enrichplot")
+suppressPackageStartupMessages(library("org.At.tair.db"))
+library("biomaRt")  # only use to remove cache bug
+library("readxl")
+```
+
+# Load expression data
+```{r}
+logFC<-read_excel("C:\\Users\\naata\\MASTER\\Enrichment\\Filtered_DEG_LFC1_padj05_results_total.xlsx")
+```
+
+# Load and preprocess ShinyGO ORA results
+
+(It is necessary to convert the tables to )
+
+```{r cars}
+
+# Reformat for clusterprofiler result intake
+
+my_data <- read_excel("C:\\Users\\naata\\MASTER\\Enrichment\\ShinyGO_ORA_enrichment_HDAC.xlsx", sheet="enrichment_GO_BP")
+
+ONT<-rep("BP",length(my_data[,1]))
+my_data <- (cbind(my_data, ONT))
+
+my_data$ID = my_data[,1]
+rownames(my_data)= my_data[,1]
+
+GeneRatio<-paste(my_data$nGenes, my_data[,4], sep="/")
+BgRatio<-paste(my_data$nGenes,65732, sep="/")
+
+
+my_data <- (cbind(my_data, GeneRatio))
+my_data <- (cbind(my_data, BgRatio))
+
+BP_GO_HDAC<-my_data[,c(9,10,6,11,12,2,4)]
+
+BP_GO_HDAC$`p.adjust` <- BP_GO_HDAC[,6]
+BP_GO_HDAC$`qvalue` <- BP_GO_HDAC[,6]
+names(BP_GO_HDAC)<-c("ONTOLOGY", "ID", "Description", "GeneRatio", "BgRatio", "pvalue","p.adjust","qvalue", "FoldEnrich")
+
+BP_GO_HDAC$intersections<-str_replace_all(my_data$Genes, "  ", ",")
+
+BP_GO_HDAC$pvalue <- as.numeric(BP_GO_HDAC$pvalue)
+BP_GO_HDAC$`p.adjust` <- as.numeric(BP_GO_HDAC$`p.adjust`)
+BP_GO_HDAC$qvalue <- as.numeric(BP_GO_HDAC$qvalue)
+
+```
+
+Transform into enrich object
+
+```{r}
+enr <- enrichDF2enrichResult(enrichDF = BP_GO_HDAC, keyColname = "ID", geneColname = "intersections", pvalueColname = "pvalue", descriptionColname = "Description", pvalueCutoff = 0.05)
+```
+
+
+# Do the same for Stress dataset
+
+```{r cars}
+
+# Reformat for clusterprofiler result intake
+
+my_data <- read_excel("C:\\Users\\naata\\MASTER\\Enrichment\\ShinyGO_ORA_Stress_Results.xlsx", sheet="enrichment_GO_BP_Stress")
+
+ONT<-rep("BP",length(my_data[,1]))
+my_data <- (cbind(my_data, ONT))
+
+my_data$ID = my_data[,1]
+rownames(my_data)= my_data[,1]
+
+GeneRatio<-paste(my_data$nGenes, my_data[,4], sep="/")
+BgRatio<-paste(my_data$nGenes,65732, sep="/")
+
+
+my_data <- (cbind(my_data, GeneRatio))
+my_data <- (cbind(my_data, BgRatio))
+
+BP_GO_Stress<-my_data[,c(9,10,6,11,12,2,4)]
+
+BP_GO_Stress$`p.adjust` <- BP_GO_Stress[,6]
+BP_GO_Stress$`qvalue` <- BP_GO_Stress[,6]
+names(BP_GO_Stress)<-c("ONTOLOGY", "ID", "Description", "GeneRatio", "BgRatio", "pvalue","p.adjust","qvalue", "FoldEnrich")
+
+BP_GO_Stress$intersections<-str_replace_all(my_data$Genes, "  ", ",")
+
+BP_GO_Stress$pvalue <- as.numeric(BP_GO_Stress$pvalue)
+BP_GO_Stress$`p.adjust` <- as.numeric(BP_GO_Stress$`p.adjust`)
+BP_GO_Stress$qvalue <- as.numeric(BP_GO_Stress$qvalue)
+
+```
+
+Transform into enrich object
+
+```{r}
+enr_S <- enrichDF2enrichResult(enrichDF = BP_GO_Stress, keyColname = "ID", geneColname = "intersections", pvalueColname = "pvalue", descriptionColname = "Description", pvalueCutoff = 0.05)
+```
+```{r}
+ncol(enr)
+```
+
+```{r}
+multienr <- data.frame(rows=c(nrow(enr), nrow(enr_S)),cols=c(ncol(enr), ncol(enr_S)), colnames<- c("HDAC", "Stress"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+ora_analysis_bp <- pairwise_termsim(enr, method = "JC")
+emapplot(ora_analysis_bp, showCategory = 10, color = "qvalue", node_label_size = 0.0001)
+```
+```{r}
+BP_GO_HDAC$geneID <- str_replace_all(BP_GO_HDAC[,9], "," ,"/")
+BP_new<-BP_GO_HDAC[,c(2,3,4,5,6,7,8,10)]
+names(BP_new)<-c("Bn_BP_ID","Description","GeneRatio","BgRatio","pvalue","p.adjust","qvalue","geneID")
+
+
+library(igraph)
+library(ggraph)
+library("genekitr")
+BP_new_discard<-BP_new[which(BP_new$Bn_BP_ID!="GO:0031497"),]
+BP_new_discard<-BP_new[which(BP_new$pvalue<0.05),][1:10,]
+
+svg("C:\\Users\\naata\\Desktop\\t10_GO_BP_terms_ORA.svg")
+genekitr::plotEnrich(BP_new, plot_type = "gomap", term_metric = "GeneRatio", stats_metric="pvalue", up_color = '#a32a31',down_color = '#3665a6', ont="BP", org="bna")
+dev.off()
+```
+
+```{r}
+# Visualizations of gene-concept network
+# library("AnnotationForge")
+# library("AnnotationDbi")
+# library("AnnotationHub")
+# 
+# # Making annotation package
+# ah <- AnnotationHub()
+# query(ah, c( "OrgDb", "Brassica napus"))
+# org.Brassicanapus.eg.db <- ah[["AH107389"]]
+# file.copy(AnnotationHub::cache(ah[["AH107389"]], "./org.Brassicanapus.eg.db"))
+# 
+# 
+# makeOrgPackage(gene_info=fSym, chromosome=fChr, go=fGO,
+#                version="0.1",
+#                maintainer="Some One <so@someplace.org>",
+#                author="Some One <so@someplace.org>",
+#                outputDir = ".",
+#                tax_id="59729",
+#                genus="Brassica",
+#                species="naous",
+#                goTable="go",
+#                verbose=T)
+
+
+library(enrichplot)
+## convert gene ID to Symbol
+# bn_map <- setReadable(enr, org.Brassicanapus.eg.db, 'ENTREZID')
+p1 <- cnetplot(enr)
+## categorySize can be scaled by 'pvalue' or 'geneNum'
+p2 <- cnetplot(enr, categorySize="pvalue", circular=TRUE, colorEdge = TRUE)
+
+# p3 <- cnetplot(enr, foldChange=geneList, circular = TRUE, colorEdge = TRUE) 
+# cowplot::plot_grid(p1, p2, p3, ncol=3, labels=LETTERS[1:3], rel_widths=c(.8, .8, 1.2))
+
+```
+
+
+
+
+```{r}
+# tree plot
+edox2 <- pairwise_termsim(enr)
+p1 <- treeplot(edox2)
+p1
+#p2 <- treeplot(edox2, hclust_method = "average")
+#aplot::plot_list(p1, p2, tag_levels='A')
+```
+```{r}
+#xx <- compareCluster(gcSample, fun="enrichGO", organism="hsa", pvalueCutoff=0.05)
+#emapplot(edox2, pie="count", #cex_category=0.5, layout="kk")
+```
+
+
+
+DNA methylation cytosine
+#"GO:0031497" --> GO:0006325
+#"GO:0006333" --> GO:0006325
+#"GO:0006323" --> GO:0051276
+#"GO:0070919" --> GO:0030422
+#"GO:0016246" --> GO:0035194
+#"GO:0031050" --> GO:0031050
+
+**GOMAP**
+
+```{r}
+#BP_GO_HDAC$geneID <- str_replace_all(BP_GO_HDAC[,9], "," ,"/")
+#BP_new<-BP_GO_HDAC[,c(2,3,4,5,6,7,8,10)]
+#names(BP_new)<-c("Bn_BP_ID","Description","GeneRatio","BgRatio","pvalue","p.adjust","qvalue","geneID")
+# BP_new_epig<-subset(BP_new, (Bn_BP_ID %in% c("GO:0051276","GO:0031507","GO:0045814","GO:0031048","GO:0070828","GO:0006325","GO:0040029","GO:0071103","GO:0044728","GO:0006305","GO:0006306","GO:0065004","GO:0006338","GO:0032776","GO:0071824","GO:0030261","GO:0031047","GO:0031048","GO:0035194","GO:0030422","GO:0070918","GO:0031167","GO:0044815","GO:0032993","GO:0000785","GO:0000123","GO:0032777","GO:0004402")))
+
+#library(igraph)
+#library(ggraph)
+#library("genekitr")
+
+
+BP_new_dna_met_cytosine<-subset(BP_new, (Bn_BP_ID %in% c("GO:0032776","GO:0006306","GO:0006305","GO:00060304","GO:0043414","GO:0006259","GO:0090304","GO:0006139","GO:0043412","GO:0006725","GO:0046483","GO:0044238","GO:0034641","GO:1901360","GO:0043170","GO:0032259","GO:0071704","GO:0006807","GO:0044237","GO:0008152","GO:0009987","GO:0008150","GO:0044815")))
+
+
+svg("C:\\Users\\naata\\Desktop\\GO_BP_terms_ORA_dnametC.svg")
+genekitr::plotEnrich(BP_new_dna_met_cytosine, plot_type = "gomap", term_metric = "GeneRatio", stats_metric="pvalue", up_color = '#a32a31',down_color = '#3665a6', ont="BP", org="bna") + coord_cartesian( expand=TRUE)
+dev.off()
+```
+**GENE NET**
+```{r}
+
+# Import external gene name - log2C mappings
+geneFC<-logFC[which(!duplicated(logFC$external_gene_name)),3]
+listfc<-as.list(t(geneFC))
+names(listfc) = as.list(t(logFC[which(!duplicated(logFC$external_gene_name)),8]))
+
+
+enr_2 <- enrichDF2enrichResult(enrichDF = BP_new_dna_met_cytosine, keyColname = "Bn_BP_ID", geneColname = "geneID", pvalueColname = "pvalue", descriptionColname = "Description", pvalueCutoff = 0.05)
+
+
+svg("C:\\Users\\naata\\Desktop\\genenet.svg")
+cnetplot(enr_2, categorySize="GeneRatio", foldChange = listfc, colorEdge = TRUE, node_label = 'gene', cex_gene=3)
+
+```
+
+
+ncRNA meiated post transcriptional gene silencing
+
+```{r}
+
+
+BP_new_ncRNAgs<-subset(BP_new, (Bn_BP_ID %in% c("GO:0035194","GO:0009892","GO:0060255","GO:0048519","GO:0043170","GO:0019222","GO:0071704","GO:0008152","GO:0065007","GO:0008150")))
+
+
+svg("C:\\Users\\naata\\Desktop\\GO_BP_terms_ORA_ncRNAgs.svg")
+genekitr::plotEnrich(BP_new_ncRNAgs, plot_type = "gomap", term_metric = "GeneRatio", stats_metric="pvalue", up_color = '#a32a31',down_color = '#3665a6', ont="BP", org="bna") + coord_cartesian( expand=TRUE)
+dev.off()
+```
+siRNA silencing
+
+```{r}
+
+
+BP_new_siRNA<-subset(BP_new, (Bn_BP_ID %in% c("GO:0008150","GO:0009987","GO:000812","GO:0065007","GO:0044237","GO:0006807","GO:0071704","GO:0050789","GO:00046483","GO:0006725", "GO:0034641", "GO:1901360", "GO:0044238", "GO:0043170", "GO:0019222", "GO:0048519", "GO:0006139", "GO:0010467", "GO:0060255", "GO:0009892", "GO:0090304", "GO:0010468", "GO:0010605", "GO:0016070", "GO:0010629", "GO:0034660", "GO:0006396", "GO:0034470", "GO:0031047", "GO:0070918", "GO:0030422" )))
+
+
+svg("C:\\Users\\naata\\Desktop\\GO_BP_terms_ORA_ncRNAgs.svg")
+genekitr::plotEnrich(BP_new_siRNA, plot_type = "gomap", term_metric = "GeneRatio", stats_metric="pvalue", up_color = '#a32a31',down_color = '#3665a6', ont="BP", org="bna") + coord_cartesian( expand=TRUE)
+dev.off()
+```
+
+```{r}
+
+enr_3 <- enrichDF2enrichResult(enrichDF = BP_new_siRNA, keyColname = "Bn_BP_ID", geneColname = "geneID", pvalueColname = "pvalue", descriptionColname = "Description", pvalueCutoff = 0.05)
+
+
+svg("C:\\Users\\naata\\Desktop\\overlap_genenet_siRNA_HDAC.svg")
+cnetplot(enr_3, categorySize="GeneRatio", foldChange = listfc, colorEdge = TRUE, node_label = 'none', cex_gene=3, showCategory = 10)
+dev.off()
+```
+
+
+```{r}
+B_selected_epi_specific = subset(BP_new, (Bn_BP_ID %in% c( "GO:0004402", "GO:0031048", "GO:0045814", "GO:0030422" , "GO:0031507", "GO:0040029", "GO:0000123", "GO:0032777" )))
+
+enr_4 <- enrichDF2enrichResult(enrichDF = B_selected_epi_specific, keyColname = "Bn_BP_ID", geneColname = "geneID", pvalueColname = "pvalue", descriptionColname = "Description", pvalueCutoff = 0.05)
+
+
+svg("C:\\Users\\naata\\Desktop\\selected_epi_genenet.svg")
+cnetplot(enr_4, categorySize="GeneRatio", foldChange = listfc, colorEdge = TRUE, node_label = 'gene', cex_gene=3, showCategory = 10)
+dev.off()
+#genekitr::plotEnrich(B_selected_epi_specific, plot_type = "gomap", term_metric = "GeneRatio", stats_metric="pvalue", up_color = '#a32a31',down_color = '#3665a6', ont="BP", org="bna") + coord_cartesian( expand=TRUE)
+```
+
+```{r}
+B_selected_aux_specific = subset(BP_new, (Bn_BP_ID %in% c( "GO:0006586", "GO:0042430", "GO:0010928", "GO:0010315" , "GO:0010252", "GO:0042445", "GO:0009926", "GO:0009733","GO:0060918", "GO:0009914", "GO:0010817", "GO:0071365", "GO:0009734", "GO:0071495", "GO:0032870", "GO:0009755", "GO:0009719", "GO:0009725" )))
+
+enr_5 <- enrichDF2enrichResult(enrichDF = B_selected_aux_specific, keyColname = "Bn_BP_ID", geneColname = "geneID", pvalueColname = "pvalue", descriptionColname = "Description", pvalueCutoff = 0.05)
+
+
+svg("C:\\Users\\naata\\Desktop\\selected_aux_genenet.svg")
+cnetplot(enr_5, categorySize="GeneRatio", foldChange = listfc, colorEdge = TRUE, node_label = 'none', cex_gene=3, showCategory = 10)
+dev.off()
+#genekitr::plotEnrich(B_selected_epi_specific, plot_type = "gomap", term_metric = "GeneRatio", stats_metric="pvalue", up_color = '#a32a31',down_color = '#3665a6', ont="BP", org="bna") + coord_cartesian( expand=TRUE)
+```
+```{r}
+svg("C:\\Users\\naata\\Desktop\\GO_BP_terms_ORA_aux.svg")
+genekitr::plotEnrich(B_selected_aux_specific, plot_type = "gomap", term_metric = "GeneRatio", stats_metric="pvalue", up_color = '#a32a31',down_color = '#3665a6', ont="BP", org="bna") + coord_cartesian( expand=TRUE)
+dev.off()
+```
+
+```{r}
+B_selected_cgrowth_specific = subset(BP_new, (Bn_BP_ID %in% c( "GO:0008283", "GO:0016049", "GO:0001558", "GO:0009826" , "GO:0042814", "GO:0042814", "GO:0060560", "GO:0051510","GO:0051301", "GO:0008356", "GO:0009786", "GO:0032502", "GO:0007275", "GO:0048731", "GO:0003006", "GO:0009791", "GO:0050793", "GO:0048582", "GO:0060560")))
+
+enr_6 <- enrichDF2enrichResult(enrichDF = B_selected_cgrowth_specific, keyColname = "Bn_BP_ID", geneColname = "geneID", pvalueColname = "pvalue", descriptionColname = "Description", pvalueCutoff = 0.05)
+
+
+svg("C:\\Users\\naata\\Desktop\\selected_cg_genenet.svg")
+cnetplot(enr_6, categorySize="GeneRatio", foldChange = listfc, colorEdge = TRUE, node_label = 'none', cex_gene=3, showCategory = 10)
+dev.off()
+#genekitr::plotEnrich(B_selected_epi_specific, plot_type = "gomap", term_metric = "GeneRatio", stats_metric="pvalue", up_color = '#a32a31',down_color = '#3665a6', ont="BP", org="bna") + coord_cartesian( expand=TRUE)
+
+svg("C:\\Users\\naata\\Desktop\\GO_BP_terms_ORA_cprolif_growth.svg")
+genekitr::plotEnrich(B_selected_cgrowth_specific, plot_type = "gomap", term_metric = "GeneRatio", stats_metric="pvalue", up_color = '#a32a31',down_color = '#3665a6', ont="BP", org="bna") + coord_cartesian( expand=TRUE)
+dev.off()
+```
+
+
+```{r}
+#library(enrichR)
+library(patchwork)
+
+
+
+# Auxin reg
+
+
+
+
+
+
+#p3 <- genekitr::plotEnrich(enr, plot_type = "geneheat", show_gene = show_gene_aux, fold_change = listfc)
+
+#
+p3 <- heatplot(ego, show_gene = show_gene_aux, foldChange = listfc)
+
+```
+
+
+
+
+```{r}
+plotEnrich(enr,
+           plot_type = 'dot',
+           scale_ratio = 2, # dot size
+           main_text_size = 10,
+           legend_text_size =8,
+           n_term = 6) # show terms
+```
+
+
+---
+# KEGG
+
+
+#Script to visualize overrepresented KEGG pathways
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Loading libraries
+
+```{r}
+library("pathview")
+library("readxl")
+library("clusterprofiler")
+library("Rgraphviz")
+library("graph")
+library("KEGGgraph")
+```
+
+
+## Loading data
+```{r}
+keggpath_DEG<-read_excel("C:\\Users\\naata\\MASTER\\Enrichment\\ShinyGO_ORA_enrichment_HDAC.xlsx", sheet = "enrichment_KEGG")
+```
+# Plotting first 
+
+
+```{r}
+search_kegg_organism('bna', by='kegg_code')
+```
+```{r}
+head(logFC)
+```
+```{r}
+data(korg, package="pathview")
+korg[which(korg[,3] == "bna"),]
+head(logFC)
+```
+
+
+```{r  pressure, echo=FALSE}
+
+logFCv <- logFC$log2FoldChange
+data_kegg <- logFC[,c(8,3)]
+data_kegg=data_kegg[which(!duplicated(data_kegg[,1])),]
+#names(data_kegg) <- logFC$external_gene_name 
+
+# Annotating DEGs
+# we want the correspondence of TAIR/Ensembl symbols with NCBI Entrez gene ids
+
+attributes_to_retrieve = c("external_gene_name","entrezgene_id")
+# see a list of "marts" available at host "plants.ensembl.org"
+listMarts <-listMarts(host="https://plants.ensembl.org")
+
+# create an object 
+mart <- useMart(biomart="plants_mart", host="https://plants.ensembl.org")
+
+# see a list of data sets within the mart
+
+listdatasets <- listDatasets(mart)
+(listDatasets(mart))[grep("bnapus",listDatasets(mart)[,1]),]
+
+# create an object for the plants_mart-Ensembl 
+
+bnapus_mart <- useMart(biomart = "plants_mart", host = "https://plants.ensembl.org", dataset = "bnapus_eg_gene"	)
+
+
+# get gene names and transcript lengths when they exist
+ann <- getBM(filter="",value= "",attributes=c("external_gene_name","entrezgene_id"), mart=bnapus_mart, useCache = FALSE)
+
+
+# for compatibility with enrichGO universe
+# genes in the universe need to be characters and not integers (Entrez gene id)
+ann$entrezgene_id = as.character(ann$entrezgene_id)
+
+data_final<- merge(data_kegg, ann, by="external_gene_name", all.x=FALSE, all.y=TRUE)
+
+data_final = t(data_final)
+names(data_final)=data_final[1,]
+
+
+
+pathview(gene.data = data_final,
+         pathway.id = "bna04075", 
+         species = "bna", # brassica napus KEGG accession 
+         limit = list(gene=5, cpd=1),
+         gene.idtype = "KEGG")
+```
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
