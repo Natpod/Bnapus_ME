@@ -21,6 +21,7 @@ BiocManager::install("biomaRt")
 library("biomaRt")
 library("readxl")
 library("geneset")
+library("data.table")
 ```
 
 Load GO term list without Bn gene annotations, access TAIR10 Ensembl Plant Arabidopsis Thaliana genes object
@@ -38,16 +39,14 @@ bnapus_mart <- useMart(biomart = "plants_mart", host = "https://plants.ensembl.o
 
 
 # get homology information
-hom_At_Bn_list <- getLDS(attributes = c("ensembl_gene_id","external_gene_name","athaliana_eg_homolog_orthology_type", "athaliana_eg_homolog_orthology_confidence", "athaliana_eg_homolog_perc_id_r1"),
+hom_At_Bn_list <- getLDS(attributes = c("ensembl_gene_id","external_gene_name","description","athaliana_eg_homolog_orthology_type", "athaliana_eg_homolog_orthology_confidence", "athaliana_eg_homolog_perc_id_r1"),
               mart = bnapus_mart,
               attributesL = c("ensembl_gene_id","external_gene_name","description","bnapus_eg_homolog_orthology_type", "bnapus_eg_homolog_orthology_confidence", "bnapus_eg_homolog_perc_id_r1"),
               martL = arabidopsis_mart
               )
 
 ```
-```{r}
-getBM(attributes = c("athaliana_eg_homolog_ensembl_gene", "athaliana_eg_homolog_associated_gene_name", "ensembl_gene_id","external_gene_name"))
-```
+
 
 Get TAIR GO terms subgroup from our selected subset of GO terms referring to auxin transport, response, metabolism, epigenetic processes, cell ploriferation and developmental process.
 
@@ -55,7 +54,6 @@ Get TAIR GO terms subgroup from our selected subset of GO terms referring to aux
 
 # Get GO terms present in arabidopsis but not present in Brassica for homolog search and completion of gene sets.
 
-go_terms_at <- getBM(mart=arabidopsis_mart, attributes=c("go_id", "name_1006", "namespace_1003"))
 
 lookup_terms = c("GO:0051093","GO:0051094","GO:0090644","GO:0030583","GO:0003006","GO:0098727","GO:0022611","GO:0048532","GO:0060033","GO:0021700","GO:0031128","GO:0009838","GO:0043696","GO:0043934","GO:0048589","GO:0048646","GO:0048869","GO:0090693","GO:0097737","GO:0016049","GO:0090354","GO:0080024","GO:0090356","GO:0090355","GO:0010249","GO:0009683","GO:0080161","GO:0071365","GO:0080026","GO:0009721","GO:0016577","GO:0061647","GO:0000412","GO:1990453","GO:0006337","GO:0090124","GO:0010424","GO:0010425","GO:0010426")
 
@@ -77,18 +75,26 @@ ortholog_gs_lookup = merge(hom_At_Bn_list, go_id_lookup_geneset, by.x="Gene.stab
 
 # get high confidence orthologs both for Arabidopsis thaliana and Brassica napus
 
-hc_ortholog_lookup = ortholog_gs_lookup[which(ortholog_gs_lookup[,5] == 1 & ortholog_gs_lookup[,10] == 1) ,]
+hc_ortholog_lookup = ortholog_gs_lookup[which(ortholog_gs_lookup[,6] == 1 & ortholog_gs_lookup[,11] == 1) ,]
 
 # Getting gs - orthologues by ENA identifiers
 
-hc_ortholog_lookup_name <- hc_ortholog_lookup[,c(12,3)]
+hc_ortholog_lookup_name <- hc_ortholog_lookup[,c(13,3)]
 colnames(hc_ortholog_lookup_name) <- c("bp", "gene")
-hc_ortholog_lookup_term <- hc_ortholog_lookup[,c(12,13)]
+hc_ortholog_lookup_term <- hc_ortholog_lookup[,c(13,14)]
 colnames(hc_ortholog_lookup_term) <- c("bp", "name")
 
 # Labelling gs
 #hc_ortholog_lookup_eid$go_id = lapply(hc_ortholog_lookup_eid$go_id, function(x){paste(x,"_o",sep="")})
 #hc_ortholog_lookup_name$go_id = lapply(hc_ortholog_lookup_name$go_id, function(x){paste(x,"_o",sep="")})
+
+fwrite(hc_ortholog_lookup, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\ortholog_list.csv', row.names=FALSE)
+
+
+########## ENSEMBL ID CODED ORTHOLOG PAIRS
+hc_ortholog_lookup_eid <- hc_ortholog_lookup[,c(13,2)]
+colnames(hc_ortholog_lookup_eid) <- c("bp", "gene")
+
 
 ```
 
@@ -110,7 +116,8 @@ go_gset_bn_pr <- go_gset_bn[which(go_gset_bn[,1] != "" ), ]
 
 # Biological process
 go_gset_bn_bp <-go_gset_bn_pr[which(go_gset_bn_pr[,2] == "biological_process"),]
-
+go_gset_bp_eid <- go_gset_bn_bp
+go_gset_bp_eid <- go_gset_bn_bp
 
 # Molecular function
 go_gset_bn_mf <-go_gset_bn_pr[which(go_gset_bn_pr[,2] == "molecular_function"),]
@@ -186,18 +193,118 @@ full_terms_CC <- unique(rbind(gset_bn_cc_term,panther_terms_CC))
 
 ```
 
+
+Ensembl annotations only include the most specific gene category gene set annotations. They need to be complete with Gene Ontology offspring terms, as it is a DAG (Diacyclic Graph) structure, and therefore a hierarchical vocabulary. This is a necessary step prior to gene enrichment
+Fill annotations with offspring terms. Section inspired by rGREAT repository (https://github.com/jokergoo/rGREAT/blob/master/inst/extdata/biomart_genesets.R)
+
+```{r}
+library(GO.db)
+library(hash)
+
+
+# Get all terms and offspring from Gene Ontology hierarchical structure, by vocabulary
+
+all_terms = data.frame(go_id = GOID(GOTERM), namespace = Ontology(GOTERM))
+
+bp_terms_all = all_terms$go_id[all_terms$namespace == "BP"]
+cc_terms_all = all_terms$go_id[all_terms$namespace == "CC"]
+mf_terms_all = all_terms$go_id[all_terms$namespace == "MF"]
+
+GOBPOFFSPRING = as.list(GOBPOFFSPRING)
+GOCCOFFSPRING = as.list(GOCCOFFSPRING)
+GOMFOFFSPRING = as.list(GOMFOFFSPRING)
+
+
+GO_names = as.list(GOTERM)
+
+############### COMPLETE BIOLOGICAL PROCESS ANNOTATIONS
+
+# Split genes by go term
+
+list_gs_by_go_bp = split(full_genesets_BP$gene, full_genesets_BP$bp)
+
+# Store completed genesets in BP in a dataframe
+
+list_gs_complete_bp = lapply(bp_terms_all, function(go_specific) {
+  
+    # Get all terms stemming from to specific OFFSPRING terms in the hierarchy
+		go_id = c(go_specific, GOBPOFFSPRING[[go_specific]])
+		
+		# Index the genes from the latter GO term list
+		unique(unlist(list_gs_by_go_bp[go_id]))
+	})
+
+	names(list_gs_complete_bp) = bp_terms_all
+	
+	# Filter by those sets with more than 0 genes with logical indexing and sapply
+	
+	list_gs_complete_bp = list_gs_complete_bp[sapply(list_gs_complete_bp, length) > 0]
+
+
+
+############### COMPLETE MOLECULAR FUNCTION ANNOTATIONS 
+
+list_gs_by_go_mf = split(full_genesets_MF$gene, full_genesets_MF$mf)
+  
+  list_gs_complete_mf = lapply(mf_terms_all, function(go_specific) {
+  	go_id = c(go_specific, GOMFOFFSPRING[[go_specific]])
+  	unique(unlist(list_gs_by_go_mf[go_id]))
+  })
+  names(list_gs_complete_mf) = mf_terms_all
+  
+  
+  list_gs_complete_mf = list_gs_complete_mf[sapply(list_gs_complete_mf, length) > 0]	
+	
+	
+############### COMPLETE CELLULAR ANNOTATIONS
+	
+
+list_gs_by_go_cc = split(full_genesets_CC$gene, full_genesets_CC$cc)
+
+	list_gs_complete_cc = lapply(cc_terms_all, function(go_specific) {
+		go_id = c(go_specific, GOCCOFFSPRING[[go_specific]])
+		unique(unlist(list_gs_by_go_cc[go_id]))
+	})
+	names(list_gs_complete_cc) = cc_terms_all
+	
+	
+	list_gs_complete_cc = list_gs_complete_cc[sapply(list_gs_complete_cc, length) > 0]
+
+
+
+saveRDS(list_gs_complete_bp, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_genesets.rds')
+saveRDS(list_gs_complete_mf, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_genesets.rds')
+saveRDS(list_gs_complete_cc, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_genesets.rds')
+
+full_terms_BP_complete<-Term(names(list_gs_complete_bp))
+term_list <- str_replace(full_terms_BP_complete, "\n", "\t")
+full_terms_BP_complete<- cbind(names(full_terms_BP_complete), term_list)
+colnames(full_terms_BP_complete)<- c("bp", "name")
+
+full_terms_MF_complete<-Term(names(list_gs_complete_mf))
+term_list <- str_replace(full_terms_MF_complete, "\n", "\t")
+full_terms_MF_complete<- cbind(names(full_terms_MF_complete), term_list)
+colnames(full_terms_MF_complete)<- c("mf", "name")
+
+full_terms_CC_complete<-Term(names(list_gs_complete_cc))
+term_list <- str_replace(full_terms_CC_complete, "\n", "\t")
+full_terms_CC_complete<- cbind(names(full_terms_CC_complete), term_list)
+colnames(full_terms_CC_complete)<- c("cc", "name")
+```
+
+
 Save in csv format
 ```{r}
 library("data.table")
 
 
-fwrite(full_genesets_BP, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_genesets.csv', row.names=FALSE)
-fwrite(full_genesets_MF, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_genesets.csv', row.names=FALSE)
-fwrite(full_genesets_CC, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_genesets.csv', row.names=FALSE)
+fwrite(list_gs_complete_bp, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_genesets.csv', row.names=FALSE)
+fwrite(list_gs_complete_mf, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_genesets.csv', row.names=FALSE)
+fwrite(list_gs_complete_cc, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_genesets.csv', row.names=FALSE)
 
-fwrite(full_terms_BP, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_terms.csv', row.names=FALSE)
-fwrite(full_terms_MF, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_terms.csv', row.names=FALSE)
-fwrite(full_terms_CC, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_terms.csv', row.names=FALSE)
+fwrite(full_terms_BP_complete, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_terms.csv', row.names=FALSE)
+fwrite(full_terms_MF_complete, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_terms.csv', row.names=FALSE)
+fwrite(full_terms_CC_complete, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_terms.csv', row.names=FALSE)
 
 ```
 Preprocess and save into GMT files
