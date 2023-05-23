@@ -53,8 +53,8 @@ then
 			for file in "$path_to_bam_files"/*.bam
 			do
 				ifilename=$(basename "$file")
-				echo "dudududu $ifilename"	 
-				#samtools index "$file" >"$ifilename".bai
+				echo "Indexing $ifilename"	 
+				samtools index "$file" >"$ifilename".bai
 			done
 		fi
 
@@ -104,10 +104,9 @@ echo -e "\n${GREEN}\n------------------------------------\n2) Performing read co
 for file in "$path_to_bam_files"/*.bam 
 do
     cfilename=$(basename "$file")
-    srun -p long -t 1:00:00 --mem 128GB samtools view -h "$file" | htseq-count -i gene_id -s no -r pos - "$path_to_genome" -m union -t exon >read_count_output/"${cfilename%.bam}".counts 
+    srun -p long -t 1:00:00 --mem 128GB htseq-count -f bam -i gene_id -s no -r pos -m union -t exon "$file" "$path_to_genome" >read_count_output/"${cfilename%.bam}".counts 
 
 done
-
 
 
 
