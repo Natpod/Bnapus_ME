@@ -26,7 +26,7 @@ Contains some of the results given at different stages of the project.
 
 ## [Getting started](#get-started)
 
-To get the helper scripts, you can fork and then clone your own copy of the current repository using the following code, changing the `YOUR-USERNAME` string by your github account username
+You can use some of the functionalities provided for some of the steps in this pipeline. To get the helper scripts, you can fork and then clone your own copy of the current repository using the following code, changing the `YOUR-USERNAME` string by your github account username
 ```
 git clone https://github.com/YOUR-USERNAME/Bnapus_ME.git
 ```
