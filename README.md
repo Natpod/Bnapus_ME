@@ -22,7 +22,7 @@ Contains all code related to Quality Checks(QC), Trimming, Mapping, Sorting, Qua
 
 ### Supplementary Material Repository (SMR)
 
-Contains the results given at different stages of the project.
+Contains some of the results given at different stages of the project.
 
 ## [Getting started](#get-started)
 
