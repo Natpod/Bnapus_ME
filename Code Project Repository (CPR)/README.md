@@ -9,7 +9,7 @@
 - Mapping : HiSAT2 using BW algorithm with graph based indexing(open source binary available in following [link with install instructions](http://daehwankimlab.github.io/hisat2/download/)) 
 - Sorting bam : samtools
 - Quantification of expression : HTSeq - HTSeqCount, NormalizationPipeline.sh (R source)
-- Differential expression analysis : DeSeq2, edgeR
+- Differential expression analysis : DeSeq2
 - Gene enrichment : clusterProfiler, bioMaRt
 
 ---
