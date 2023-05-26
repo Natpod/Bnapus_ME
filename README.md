@@ -1,5 +1,8 @@
+
+
 # Bnapus_ME Project
 
+<img src="https://github.com/Natpod/genekitr/Bnapus_ME/assets/34302878/b7337c2c-076a-46e8-9777-b2dfb742d613" align="left" width="200"/>
 <img src="https://img.shields.io/github/languages/code-size/Natpod/underlinejobs" alt="GitHub Code Size in Bytes">
 
 Transcriptomic analysis of epigenetic determinants of Microspore Embryogenesis in B.napus code for the Final Masters Thesis in Computational Biology
