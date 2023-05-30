@@ -1,0 +1,493 @@
+---
+title: "get_At_homologs_Ensembl"
+author: "Natalia García"
+date: '2023-05-12'
+output: html_document
+---
+
+# Objective : 
+
+getting preprocessed .gmt files and data.frames with genesets that are available in 
+
+* Last PANTHERdb release (v17) - via geneset package (https://github.com/GangLiLab/geneset)
+* Ensembl release 56 _Brassica napus_ GO gene categories
+* Ensembl release 56 _Arabidopsis thaliana_ GO gene categories from reciprocal ortholog _B.napus_ and _A. thaliana_ gene pairs (Infered through phylogeny and alignment identity values in Ensembl Compara API) in a set of GO categories of interest pertaining to developmental processes, auxin response, transport, synthesis, epigenetic modifications (nucleosome and DNA methylation on cytosine) (see lookup_terms)
+
+
+Install and load packages
+
+```{r}
+BiocManager::install("biomaRt")
+library("biomaRt")
+library("readxl")
+library("geneset")
+library("data.table")
+```
+
+Load GO term list without Bn gene annotations, access TAIR10 Ensembl Plant Arabidopsis Thaliana genes object
+
+
+```{r}
+
+# create an object for the plants_mart-Ensembl 
+ensembl_plants <- useEnsemblGenomes(biomart = "plants_mart")
+
+
+# create the mart object for both species
+arabidopsis_mart <- useMart(biomart = "plants_mart", host = "https://plants.ensembl.org", dataset = "athaliana_eg_gene")
+bnapus_mart <- useMart(biomart = "plants_mart", host = "https://plants.ensembl.org", dataset = "bnapus_eg_gene"	)
+
+
+# get homology information
+hom_At_Bn_list <- getLDS(attributes = c("ensembl_gene_id","external_gene_name","description","athaliana_eg_homolog_orthology_type", "athaliana_eg_homolog_orthology_confidence", "athaliana_eg_homolog_perc_id_r1"),
+              mart = bnapus_mart,
+              attributesL = c("ensembl_gene_id","external_gene_name","description","bnapus_eg_homolog_orthology_type", "bnapus_eg_homolog_orthology_confidence", "bnapus_eg_homolog_perc_id_r1"),
+              martL = arabidopsis_mart
+              )
+
+```
+
+
+Get TAIR GO terms subgroup from our selected subset of GO terms referring to auxin transport, response, metabolism, epigenetic processes, cell ploriferation and developmental process.
+
+```{r setup, include=FALSE}
+
+# Get GO terms present in arabidopsis but not present in Brassica for homolog search and completion of gene sets.
+
+
+lookup_terms = c("GO:0051093","GO:0051094","GO:0090644","GO:0030583","GO:0003006","GO:0098727","GO:0022611","GO:0048532","GO:0060033","GO:0021700","GO:0031128","GO:0009838","GO:0043696","GO:0043934","GO:0048589","GO:0048646","GO:0048869","GO:0090693","GO:0097737","GO:0016049","GO:0090354","GO:0080024","GO:0090356","GO:0090355","GO:0010249","GO:0009683","GO:0080161","GO:0071365","GO:0080026","GO:0009721","GO:0016577","GO:0061647","GO:0000412","GO:1990453","GO:0006337","GO:0090124","GO:0010424","GO:0010425","GO:0010426")
+
+
+go_gset <- getBM(mart=arabidopsis_mart, attributes=c("go_id", "name_1006", "ensembl_gene_id", "namespace_1003"))
+
+go_id_lookup_geneset = go_gset[which(go_gset[,1] %in% lookup_terms),]
+
+go_gset_at_bp <-go_id_lookup_geneset[which(go_id_lookup_geneset[,4] == "biological_process"),c(1,2,3)]
+
+
+
+
+
+go_gset_bnapus <- getBM(mart=bnapus_mart, attributes=c("go_id", "name_1006", "ensembl_gene_id", "namespace_1003"))
+
+```
+
+Get the corresponding high confidence "reciprocal ortholog" gene pair list
+
+```{r}
+lookup_terms_all = c("GO:0040029","GO:0016570","GO:0034728","GO:0032776","GO:0080188","GO:0016575","GO:0016574","GO:0016573","GO:0016571","GO:0031056","GO:0061647","GO:0016578","GO:0000412","GO:0004668","GO:0016577","GO:1990453","GO:0006334","GO:0006337","GO:0090124","GO:0090116","GO:0010424","GO:0010425","GO:0010426","GO:0141010","GO:0009850","GO:0009733","GO:0060918","GO:0090354","GO:0080024","GO:0090356","GO:0090355","GO:0010249","GO:0009683","GO:0009852","GO:0009851","GO:0071365","GO:0080026","GO:0009721","GO:0080162","GO:0010315","GO:0009926","GO:0060919","GO:0080161","GO:0008283","GO:0051301","GO:0016049","GO:0032502","GO:0042127","GO:0008284","GO:0008285","GO:0008356","GO:0051302","GO:0098725","GO:0051782","GO:0051781","GO:0009826","GO:0016475","GO:0048588","GO:0009825","GO:0030308","GO:0030307","GO:0001558","GO:0051210","GO:0051211","GO:0051093","GO:0051094","GO:0090644","GO:0030583","GO:0003006","GO:0098727","GO:0022611","GO:0009653","GO:0048532","GO:0060033","GO:0021700","GO:0010014","GO:0048856","GO:0031128","GO:0050793","GO:0009838","GO:0043696","GO:0043934","GO:0048589","GO:0048646","GO:0048869","GO:0090693","GO:0097737")
+
+attr <- c( "Bnapus_ensembl_id","Bnapus_external_name","Bnapus_gene_description", "Athaliana_ortholog_type","Athaliana_ortholog_score","Bnapus_identity_Athaliana_ortholog", "Athaliana_ensembl_id","Athaliana_external_name","Athaliana_gene_description", "Bnapus_ortholog_type", "Bnapus_ortholog_score","Athaliana_identity_Bnapus_ortholog")
+
+# get high confidence orthologs
+hom_At_Bn_hc<-hom_At_Bn_list[which(hom_At_Bn_list[,5] == 1 & hom_At_Bn_list[,11] == 1) ,]
+colnames(hom_At_Bn_hc) <- attr
+
+# Merge A. thaliana genesets of interest with ortholog list
+
+ortholog_gs_lookup = merge(hom_At_Bn_list, go_id_lookup_geneset, by.x="Gene.stable.ID.1", by.y="ensembl_gene_id")
+
+# get high confidence orthologs both for Arabidopsis thaliana and Brassica napus
+
+hc_ortholog_lookup = ortholog_gs_lookup[which(ortholog_gs_lookup[,6] == 1 & ortholog_gs_lookup[,11] == 1) ,]
+
+# Getting gs - orthologues by ENA identifiers
+
+hc_ortholog_lookup_name <- hc_ortholog_lookup[,c(13,3)]
+colnames(hc_ortholog_lookup_name) <- c("bp", "gene")
+hc_ortholog_lookup_term <- hc_ortholog_lookup[,c(13,14)]
+colnames(hc_ortholog_lookup_term) <- c("bp", "name")
+
+########## ENSEMBL ID CODED ORTHOLOG PAIRS
+hc_ortholog_lookup_eid <- hc_ortholog_lookup[,c(13,2)]
+colnames(hc_ortholog_lookup_eid) <- c("bp", "gene")
+
+
+
+
+# Merge ortholog pairs with bnapus and athaliana GO sets, save
+
+ortholog_gs_all = merge(hom_At_Bn_hc[,c(1,2,7,8)], go_gset[which(go_gset$namespace_1003=="biological_process"),], by.x="Athaliana_ensembl_id", by.y="ensembl_gene_id")
+ortholog_gs_all = merge(ortholog_gs_all, go_gset_bnapus[which(go_gset_bnapus$namespace_1003=="biological_process"),], by.x="Bnapus_ensembl_id", by.y="ensembl_gene_id")
+ortholog_gs_all <- ortholog_gs_all[,c(1,2,3,4,5,6,8,10)]
+colnames(ortholog_gs_all) <- c("Bnapus_ensembl_id","Athaliana_ensembl_id", "Bnapus_external_name", "Athaliana_external_name", "Athaliana_go_id", "Athaliana_go_name", "Bnapus_go_id", "Bnapus_go_description")
+
+# Get all genes from GO interest in both genelists
+gs_lookup_all_genes = ortholog_gs_all[unique(which(ortholog_gs_all$Athaliana_go_id %in% lookup_terms_all), which(ortholog_gs_all$Bnapus_go_id %in% lookup_terms_all)),]
+
+
+fwrite(hom_At_Bn_hc, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\ortholog_list_all.csv', row.names=FALSE)
+fwrite(ortholog_gs_all, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\ortholog_list_go.csv', row.names=FALSE)
+
+
+
+
+```
+
+
+Last step : get _Brassica napus_ Ensembl Release 56 and PANTHERdb available genesets
+
+```{r}
+library("data.table")
+
+
+
+############## ENSEMBL - UniprotKB curated GO BASED annotations
+# get and save brassica geneset
+
+go_gset_bn <- getBM(mart=bnapus_mart, attributes=c("go_id","namespace_1003","ensembl_gene_id", "name_1006"))
+go_gset_bn_pr <- go_gset_bn[which(go_gset_bn[,1] != "" ), ]
+
+# Separate by
+
+# Biological process
+go_gset_bn_bp <-go_gset_bn_pr[which(go_gset_bn_pr[,2] == "biological_process"),]
+go_gset_bp_eid <- go_gset_bn_bp
+go_gset_bp_eid <- go_gset_bn_bp
+
+# Molecular function
+go_gset_bn_mf <-go_gset_bn_pr[which(go_gset_bn_pr[,2] == "molecular_function"),]
+
+
+# Cellular Component
+go_gset_bn_cc <-go_gset_bn_pr[which(go_gset_bn_pr[,2] == "cellular_component"),]
+
+
+
+# Map and merge to ENA identifiers
+
+map_name_ensembl <- getBM(mart=bnapus_mart, attributes=c("ensembl_gene_id", "external_gene_name"))
+map_name_ensembl <- map_name_ensembl[which(map_name_ensembl[,2] != "" ),]
+
+gset_bn_bp_name <- merge(go_gset_bn_bp,map_name_ensembl, by="ensembl_gene_id")
+gset_bn_bp_gs <- gset_bn_bp_name[,c(2,5)]
+colnames(gset_bn_bp_gs) <- c("bp", "gene")
+
+gset_bn_bp_term <- gset_bn_bp_name[,c(2,4)]
+colnames(gset_bn_bp_term) <- c("bp", "name")
+
+
+gset_bn_mf_name <- merge(go_gset_bn_mf,map_name_ensembl, by="ensembl_gene_id")
+gset_bn_mf_gs <- gset_bn_mf_name[,c(2,5)]
+colnames(gset_bn_mf_gs) <- c("mf", "gene")
+
+gset_bn_mf_term <- gset_bn_mf_name[,c(2,4)]
+colnames(gset_bn_mf_term) <- c("mf", "name")
+
+
+gset_bn_cc_name <- merge(go_gset_bn_cc,map_name_ensembl, by="ensembl_gene_id")
+gset_bn_cc_gs <- gset_bn_cc_name[,c(2,5)]
+colnames(gset_bn_cc_gs) <- c("cc", "gene")
+
+gset_bn_cc_term <- gset_bn_cc_name[,c(2,4)]
+colnames(gset_bn_cc_term) <- c("cc", "name")
+
+
+
+############## ENSEMBL - UniprotKB curated GO BASED annotations
+
+pathways_Panther_BP <- geneset::getGO(org = "Brassica napus", ont = "bp")
+pathways_Panther_MF <- geneset::getGO(org = "Brassica napus", ont = "mf")
+pathways_Panther_CC <- geneset::getGO(org = "Brassica napus", ont = "cc")
+
+panther_gset_BP <- pathways_Panther_BP$geneset
+panther_terms_BP <-pathways_Panther_BP$geneset_name
+colnames(panther_terms_BP) <- c("bp","name")
+
+
+panther_gset_MF <- pathways_Panther_MF$geneset
+panther_terms_MF <-pathways_Panther_MF$geneset_name
+colnames(panther_terms_MF) <- c("mf","name")
+
+
+panther_gset_CC <- pathways_Panther_CC$geneset
+panther_terms_CC <-pathways_Panther_CC$geneset_name
+colnames(panther_terms_CC) <- c("cc","name")
+
+
+
+############## Bind all annnotations to Arabidopsis selected gs of interest reciprocal ortholog list
+
+full_genesets_BP <- unique(rbind(hc_ortholog_lookup_name, rbind(gset_bn_bp_gs,panther_gset_BP)))
+full_genesets_MF <- unique(rbind(gset_bn_mf_gs,panther_gset_MF))
+full_genesets_CC <- unique(rbind(gset_bn_cc_gs,panther_gset_CC))
+
+
+full_terms_BP <- unique(rbind(hc_ortholog_lookup_term, rbind(gset_bn_bp_term,panther_terms_BP)))
+full_terms_MF <- unique(rbind(gset_bn_mf_term,panther_terms_MF))
+full_terms_CC <- unique(rbind(gset_bn_cc_term,panther_terms_CC))
+
+```
+
+
+Ensembl annotations only include the most specific gene category gene set annotations. They need to be complete with Gene Ontology offspring terms, as it is a DAG (Diacyclic Graph) structure, and therefore a hierarchical vocabulary. This is a necessary step prior to gene enrichment
+Fill annotations with offspring terms. Section inspired by rGREAT repository (https://github.com/jokergoo/rGREAT/blob/master/inst/extdata/biomart_genesets.R)
+
+```{r}
+library(GO.db)
+library(hash)
+
+
+# Get all terms and offspring from Gene Ontology hierarchical structure, by vocabulary
+
+all_terms = data.frame(go_id = GOID(GOTERM), namespace = Ontology(GOTERM))
+
+bp_terms_all = all_terms$go_id[all_terms$namespace == "BP"]
+cc_terms_all = all_terms$go_id[all_terms$namespace == "CC"]
+mf_terms_all = all_terms$go_id[all_terms$namespace == "MF"]
+
+GOBPOFFSPRING = as.list(GOBPOFFSPRING)
+GOCCOFFSPRING = as.list(GOCCOFFSPRING)
+GOMFOFFSPRING = as.list(GOMFOFFSPRING)
+
+
+GO_names = as.list(GOTERM)
+
+############### COMPLETE BIOLOGICAL PROCESS ANNOTATIONS
+
+# Split genes by go term
+
+list_gs_by_go_bp = split(full_genesets_BP$gene, full_genesets_BP$bp)
+
+# Store completed genesets in BP in a dataframe
+
+list_gs_complete_bp = lapply(bp_terms_all, function(go_specific) {
+  
+    # Get all terms stemming from to specific OFFSPRING terms in the hierarchy
+		go_id = c(go_specific, GOBPOFFSPRING[[go_specific]])
+		
+		# Index the genes from the latter GO term list
+		unique(unlist(list_gs_by_go_bp[go_id]))
+	})
+
+	names(list_gs_complete_bp) = bp_terms_all
+	
+	# Filter by those sets with more than 0 genes with logical indexing and sapply
+	
+	list_gs_complete_bp = list_gs_complete_bp[sapply(list_gs_complete_bp, length) > 0]
+
+
+
+############### COMPLETE MOLECULAR FUNCTION ANNOTATIONS 
+
+list_gs_by_go_mf = split(full_genesets_MF$gene, full_genesets_MF$mf)
+  
+  list_gs_complete_mf = lapply(mf_terms_all, function(go_specific) {
+  	go_id = c(go_specific, GOMFOFFSPRING[[go_specific]])
+  	unique(unlist(list_gs_by_go_mf[go_id]))
+  })
+  names(list_gs_complete_mf) = mf_terms_all
+  
+  
+  list_gs_complete_mf = list_gs_complete_mf[sapply(list_gs_complete_mf, length) > 0]	
+	
+	
+############### COMPLETE CELLULAR ANNOTATIONS
+	
+
+list_gs_by_go_cc = split(full_genesets_CC$gene, full_genesets_CC$cc)
+
+	list_gs_complete_cc = lapply(cc_terms_all, function(go_specific) {
+		go_id = c(go_specific, GOCCOFFSPRING[[go_specific]])
+		unique(unlist(list_gs_by_go_cc[go_id]))
+	})
+	names(list_gs_complete_cc) = cc_terms_all
+	
+	
+	list_gs_complete_cc = list_gs_complete_cc[sapply(list_gs_complete_cc, length) > 0]
+
+
+
+saveRDS(list_gs_complete_bp, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_genesets.rds')
+saveRDS(list_gs_complete_mf, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_genesets.rds')
+saveRDS(list_gs_complete_cc, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_genesets.rds')
+
+full_terms_BP_complete<-Term(names(list_gs_complete_bp))
+term_list <- str_replace(full_terms_BP_complete, "\n", "\t")
+full_terms_BP_complete<- cbind(names(full_terms_BP_complete), term_list)
+colnames(full_terms_BP_complete)<- c("bp", "name")
+
+full_terms_MF_complete<-Term(names(list_gs_complete_mf))
+term_list <- str_replace(full_terms_MF_complete, "\n", "\t")
+full_terms_MF_complete<- cbind(names(full_terms_MF_complete), term_list)
+colnames(full_terms_MF_complete)<- c("mf", "name")
+
+full_terms_CC_complete<-Term(names(list_gs_complete_cc))
+term_list <- str_replace(full_terms_CC_complete, "\n", "\t")
+full_terms_CC_complete<- cbind(names(full_terms_CC_complete), term_list)
+colnames(full_terms_CC_complete)<- c("cc", "name")
+```
+
+
+Save in csv format
+```{r}
+library("data.table")
+
+
+fwrite(list_gs_complete_bp, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_genesets.csv', row.names=FALSE)
+fwrite(list_gs_complete_mf, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_genesets.csv', row.names=FALSE)
+fwrite(list_gs_complete_cc, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_genesets.csv', row.names=FALSE)
+
+fwrite(full_terms_BP_complete, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_terms.csv', row.names=FALSE)
+fwrite(full_terms_MF_complete, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_terms.csv', row.names=FALSE)
+fwrite(full_terms_CC_complete, 'C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_terms.csv', row.names=FALSE)
+
+```
+Preprocess and save into GMT files
+
+```{r}
+library(stringr)
+library(readr)
+library(dplyr)
+library(tidyr)
+
+# Save as multilevel list tidy format through pivot_longer and pivot wider
+
+# Biological Process
+ml_BP_GO <- full_genesets_BP %>%
+  pivot_longer(gene, names_to = "Var", names_prefix = "Var") %>% 
+  pivot_wider(names_from = bp, values_from = value, names_sep = "", values_fn = list)
+
+# Cellular Component
+ml_CC_GO <- full_genesets_MF %>%
+  pivot_longer(gene, names_to = "Var", names_prefix = "Var") %>% 
+  pivot_wider(names_from = mf, values_from = value, names_sep = "", values_fn = list)
+
+# Molecular Function
+ml_MF_GO <- full_genesets_CC %>%
+  pivot_longer(gene, names_to = "Var", names_prefix = "Var") %>% 
+  pivot_wider(names_from =cc, values_from = value, names_sep = "", values_fn = list)
+
+
+```
+
+
+```{r}
+# Handling pivoted multilevel lists and converting into gmt file format
+
+# GO_BP
+listindex <- seq(ml_BP_GO)
+pathwayindex <- names(ml_BP_GO)
+
+file.create("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\Bna_GO_BP_formatted.gmt")
+invisible(lapply(listindex[2:length(listindex)], function(i){
+  cat(names(ml_BP_GO)[i], "N/A", lapply(ml_BP_GO[[i]], paste, collapse = "\t")[[1]], "\n", sep="\t", file="C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\Bna_GO_BP_formatted.gmt", append=TRUE)}))
+
+# GO_CC
+listindex <- seq(ml_CC_GO)
+pathwayindex <- names(ml_CC_GO)
+
+file.create("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\Bna_GO_CC_formatted.gmt")
+invisible(lapply(listindex[2:length(listindex)], function(i){
+  cat(names(ml_CC_GO)[i], "N/A", lapply(ml_CC_GO[[i]], paste, collapse = "\t")[[1]], "\n", sep="\t", file="C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\Bna_GO_CC_formatted.gmt", append=TRUE)}))
+
+# GO_CC
+listindex <- seq(ml_MF_GO)
+pathwayindex <- names(ml_MF_GO)
+
+file.create("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\Bna_GO_MF_formatted.gmt")
+invisible(lapply(listindex[2:length(listindex)], function(i){
+  cat(names(ml_MF_GO)[i], "N/A", lapply(ml_MF_GO[[i]], paste, collapse = "\t")[[1]], "\n", sep="\t", file="C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\Bna_GO_MF_formatted.gmt", append=TRUE)}))
+
+
+```
+
+
+
+# GET KEGG LIST from 
+
+
+## Preprocess KEGG database gene names - Ensembl ID to external gene name mappings
+
+```{r}
+
+# Load libraries
+suppressPackageStartupMessages(library("tidyverse"))
+suppressPackageStartupMessages(library("biomaRt"))
+suppressPackageStartupMessages(library("biomartr"))
+
+pathways_KEGG <- geneset::getKEGG(org = "bna",category = "pathway")
+
+KEGG_table_preprocess = read.table("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\Bna_ALL.KEGG.txt", header=TRUE, sep="\t")
+
+KEGG <- KEGG_table_preprocess[,1:2]
+
+
+# get gene names and transcript lengths when they exist
+ann <- getBM(filter="ensembl_gene_id",value=KEGG$Gene, attributes=c("ensembl_gene_id","external_gene_name"), mart=bnapus_mart, useCache = FALSE)
+
+KEGG <-merge(KEGG,ann,by.x="Gene", by.y="ensembl_gene_id",all.x = FALSE, all.y = TRUE)
+
+# Subset only external genes
+KEGG_term2gene <- KEGG[,c(2,3)]
+colnames(KEGG_term2gene) <- c("term","gene")
+
+KEGG_term2name <- KEGG[,c(2,2)]
+colnames(KEGG_term2name) <- c("term","name")
+
+write.csv(KEGG_term2gene, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\tfm\\KEGG_gs_pairs.csv", row.names =FALSE)
+write.csv(KEGG_term2name, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\tfm\\KEGG_gs_descriptions.csv", row.names =FALSE)
+
+# KEGG Pathways
+ml_KEGG <- KEGG %>%
+  pivot_longer(external_gene_name, names_to = "Var", names_prefix = "Var") %>% 
+  pivot_wider(names_from = Gene.set.name, values_from = value, names_sep = "", values_fn = list)
+
+
+# Save KEGG
+listindex <- seq(ml_KEGG)
+pathwayindex <- names(ml_KEGG)
+
+file.create("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\Bna_KEGG_formatted.gmt")
+invisible(lapply(listindex[2:length(listindex)], function(i){
+  cat(names(ml_KEGG)[i], "N/A", lapply(ml_KEGG[[i]], paste, collapse = "\t")[[1]], "\n", sep="\t", file="C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\Bna_KEGG_formatted.gmt", append=TRUE)}))
+
+
+```
+
+
+
+
+
+# In case Entrez ID gene categories need to be accessed - NCBI AnnotationHub object (only Brassica napus annotation available)
+
+```{r}
+
+#hc_ortholog_lookup_eid <- hc_ortholog_lookup[,c(12,2)]
+colnames(hc_ortholog_lookup_eid) <- c("bp","gene")
+
+# Map and merge to Entrez ID identifiers (less mappings observed)
+
+map_eid_ensembl <- getBM(mart=bnapus_mart, attributes=c("ensembl_gene_id", "entrezgene_id"))
+
+map_eid_ensembl <- map_eid_ensembl[which(map_eid_ensembl[,2] != "" ),]
+
+library("AnnotationForge")
+library("AnnotationDbi")
+library("AnnotationHub")
+library("OrgDB")
+
+# Making annotation package
+ah <- AnnotationHub()
+
+#Ensembl 56
+query(ah, c( "OrgDb", "Brassica napus"))
+
+org.Brassicanapus.eg.db <- ah[["AH107389"]]
+
+egid <- keys(org.Brassicanapus.eg.db, "ENTREZID")
+
+db_gs_ncbi <- select(org.Brassicanapus.eg.db, egid, c("GENENAME", "GO"), "ENTREZID")
+
+gs_ncbi_filtered <- db_gs_ncbi[which(db_gs_ncbi[,3] != "<NA>"),c(1,3)]
+
+```
+
+
+```{r}
+DEG_Stress <-read_csv("C:\\Users\\naata\\MASTER\\Enrichment\\Final_condition_PErep_vs_VMrep_padj0.05_woPErep3_LFC1filtered.csv")
+DEG_Stress_gn<- merge(DEG_Stress, map_name_ensembl, by="ensembl_gene_id")
+
+fwrite(DEG_Stress_gn, "C:\\Users\\naata\\MASTER\\Enrichment\\Final_condition_PErep_vs_VMrep_padj0.05_woPErep3_LFC1filtered.csv", row.names = FALSE)
+```
+
