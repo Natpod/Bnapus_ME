@@ -1,0 +1,41 @@
+---
+title: "gsva"
+author: "Natalia García"
+date: '2023-05-24'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(EnrichmentBrowser)
+library(SummarizedExperiment)
+```
+
+## Loading expression data
+
+```{r cars}
+logTPM_data<-read.csv("C:\\Users\\naata\\Downloads\\log2TPM_all_exp.csv")
+mappings<-read.csv("C:\\Users\\naata\\Downloads\\bna_ID_to_name.txt")
+colnames(mappings)<-c("gene_id","gene")
+
+data<-merge(logTPM_data,mappings, by="gene_id")
+data<-data[!duplicated(data[,13]),colnames(data)!="gene_id"]
+rownames(data)<-data$gene
+data$gene <- NULL
+
+# pathway_list
+ml_BP_GO <- readRDS("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_genesets.rds")
+
+```
+
+## Calculate Enrichment Scores per sample
+
+```{r pressure, echo=FALSE}
+library(GSVA)
+gsva.es <- gsva(data, ml_BP_GO, verbose=TRUE)
+```
+
+# write results
+```{r}
+write.csv(gsva.es ,"C://Users//naata//Documents//MASTER//TFM//gsva_results.csv")
+```
+
