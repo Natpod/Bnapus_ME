@@ -32,7 +32,7 @@ FPKM_calc <- function(mergedcount_dataset){
   
   # Count up the total reads in a sample and divide that number by 1,000,000 – to calculate scaling factor.
   # Divide the read counts by the “per million” scaling factor. This normalizes for sequencing depth, giving you reads per million (RPM)
-  # Divide the RPM values by the length of the gene, in kilobases.
+  # Divide the RPM values by the length of the "union - exon gene model", in kilobases.
   
   countscol <- ncol(mergedcount_dataset)
   scalingfactor <- colSums(mergedcount_dataset)/(10**6)
