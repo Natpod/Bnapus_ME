@@ -1,0 +1,901 @@
+---
+title: "DESEQ_R_PE_HDAC"
+author: "Natalia Garcia Sanchez"
+date: "2023-06-05"
+output: html_document
+---
+
+```{r Load Packages, include=FALSE}
+library("DESeq2")
+library("apeglm")
+library("pheatmap")
+library("tidyverse")
+require("vidger")
+library("tidyverse")
+library("biomaRt")
+library("ggplot2")
+library("EnhancedVolcano")
+library("RColorBrewer")
+library("gplots")
+library("amap")
+library("ggplot2")
+library("BiocParallel")
+
+suppressWarnings(suppressMessages({
+  library('easypackages',warn.conflicts = FALSE, quietly=TRUE)
+  library("readr",warn.conflicts = FALSE, quietly=TRUE)
+  library("ggplot2",warn.conflicts = FALSE, quietly=TRUE)
+  library("RColorBrewer",warn.conflicts = FALSE, quietly=TRUE)
+  library("biomaRt",warn.conflicts = FALSE, quietly=TRUE)
+  library("DESeq2",warn.conflicts = FALSE, quietly=TRUE)
+  library("pheatmap",warn.conflicts = FALSE, quietly=TRUE)
+  library("RColorBrewer",warn.conflicts = FALSE, quietly=TRUE)
+  library("viridis",warn.conflicts = FALSE, quietly=TRUE)
+  library("ggpubr",warn.conflicts = FALSE, quietly=TRUE)
+  library('EnhancedVolcano',warn.conflicts = FALSE, quietly=TRUE)}))
+
+```
+
+# Differential Expression analysis description
+
+Differential Gene Expression (DGE) analysis will consist of simply two
+lines of code:
+
+1.  The first will call the DESeq function on a DESeqDataSet object that
+    we've just created under the name dds. It will be returned under the
+    same R object name dds.
+2.  The results are extracted using the results function on the dds
+    object and results will be extracted as a table under the name res
+    (short for results).
+
+# Methods
+
+*Pairwise Differential Expression with Counts in R using DESeq2*
+
+Statistical analysis with `DESeq()` function will perform the following
+steps of the DGE pipeline:
+
+-   **Estimating size factors + Normalization** : This method of
+    normalization consists on calculating a *scaling size factor* based
+    on the *mean of the ratios* of each expression level per sample and
+    gene with the Geometric Mean of expression levels across genes in
+    the dataset. This part of the analysis accounts for the fact that
+    standard RNA-seq measures relative abundances of transcripts within
+    each sample, not absolute abundances (i.e. transcripts/cell).
+    Because of this, if libraries are sequenced to different depths,
+    genes with identical expression levels will have different counts.
+    It may seem that simply adjusting for sequencing depth could account
+    for this issue, but changes in gene expression among samples
+    (library composition) account for another level of sequencing bias,
+    so a slightly more complex normalization is applied.
+-   **Estimating dispersion through *three dispersion estimate steps***:
+    This is necessary in a High Throughput Sequence (HTS) experiment, as
+    genes with lower levels of counts will also present more expression
+    variability, and present difficulties for fitting a Generalized
+    Linear Model accurately. DESeq2 models the variance in the counts
+    for each sample using a Negative Binomial distribution. In this
+    distribution the variance in counts is determined by a dispersion
+    parameter. This parameter needs to be estimated for each gene, but
+    for sample sizes typical to RNA-Seq (3-5 per treatment) there isn't
+    a lot of power to estimate it accurately. The key innovation of
+    packages like DESeq2 is to assume genes with similar expression have
+    similar dispersions, and to pool information across them to estimate
+    the dispersion for each gene. These steps accomplish that using an
+    "empirical Bayesian" Maximum Likelihood Estimation (MLE) procedure.
+    This establishes that the dispersion parameter for a particular gene
+    is a compromise between the signal in the data for that gene, and
+    the signal in other, similar genes.
+-   **Fitting a Generalized Linear Model** and **Statistical hypothesis
+    testing**: Once the dispersions are estimated and the size factors
+    are accounted for fitting in a Generalized Linear Model from which
+    log2 fold change (LFC) values are extrapolated, this part of the
+    analysis asks if there are treatment effects for each gene. In the
+    default case, DESeq2 uses a Wald parametric test to ask if the LFC
+    between two treatments is significantly different than zero. This
+    test is used upon performing hypothesis testing a the set of
+    predictors used in to a variety of models on binary or continuous
+    variables, as an approximation of the Likelihood Ratio Test.
+
+We will also control statistical inference results through **False
+Discovery Rate (FDR) control**. This step adjust the previously
+calculated p-values in the hypothesis testing as a control of type I
+errors (False Positive Errors occurring as a result of the latter
+hypothesis testing across multiple comparisons). Along these lines,
+Benjamini-Hochberg: Benjamini and Hochberg (BH) (1995) defined the
+concept of FDR and created an algorithm to control the expected FDR
+below a specified level given a list of independent p-values. An
+interpretation of the BH method for controlling the FDR is implemented
+in DESeq2 in which we rank the genes by p-value, then multiply each
+ranked p-value by m/rank.
+
+# Results
+
+The pipeline will return csv results of normalized counts, their mean
+across samples (baseMean), LFC values (log2FoldChange) and a Standard
+Error of this measure in the GLM (lfcSE), the Wald statistic value
+(stat) and p-values(pvalue) from hypothesis testing, and the p-adj (FDR
+q-value) from the BH FDR control method (padj), complete and filtered by
+set of genes with significant differential expression (pvalue\<0.05).
+
+Once the statistical inference is done, a preliminary exploration of the
+Differentially Expressed Genes is performed. In this way, the present
+script will also undertake exploratory data analysis of RNAseq data with
+DESeq2 for a variety of visualization, QC and other plots to get a sense
+of what the RNAseq data looks like based on DESEq2 analysis.
+
+1)  Expression of gene across the samples- what does expression look
+    like across genes? Histogram of the log scaled counts and filtering
+    the low expressed genes
+2)  Clustering analysis (PCA, Hierarchical clustering, Heatmap)
+3)  Significant Genes - MA plot
+4)  Significant Genes - Volcano plot
+
+------------------------------------------------------------------------
+
+# Loading data
+
+Loading data for HiSAT2 alignment standarization and Differential
+Expression analysis.
+
+Listing files from input directory, accounting for the order of the
+files. Note that the detected counts have the `*.counts`
+
+```{r read count files}
+# Create an object with the directory containing HTseq counts:
+directory <- "/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/counts"
+
+# list.files(directory) will return the files in the input directory
+sampleFiles <- list.files(directory, pattern = ".*counts")
+sampleFiles
+```
+
+Reading merged counts for standarization (mean of ratios) pipeline,
+accounting for the order of the files.
+
+First it is required to create a sample table accounting for the sample
+names, file names, experimental conditions they face, and biological
+replicate number
+
+```{r create vector samplefiles}
+
+# create a vector of sample names, ensuring that these are in the same order as the "sampleFiles" object.
+sampleNames <- c("Trep1", "Trep2", "Trep3", "VMrep1", "VMrep2", "VMrep3")
+
+# create a vector of conditions in order, ensuring that these are in the same order as the "sampleFiles" object.
+replicate <- c("Rep1","Rep2", "Rep3","Rep1","Rep2", "Rep3")
+
+# create a vector of conditions. again, mind that they are ordered correctly!
+sampleCondition <- c("T","T", "T","VM", "VM", "VM")
+
+# Passing informative condition, replicate, sample file, and sample name vectors onto a sampleTable ready for reading by DeSeq2
+sampleTable <- data.frame(
+		sampleName = sampleNames,
+		fileName = sampleFiles,
+		condition = sampleCondition,
+		replicate = replicate)
+
+```
+
+## Make DESeq2 object from counts and metadata
+
+Creating DESeqDataSet object with directory passing the metadata from
+sampleTable and the count directory files
+
+Create an object with the directory containing HTseq counts, specifying
+the control condition `C`:
+```{r}
+
+
+countTable <- read.csv("/home/famgarcia/VM_vs_HDAC_DEA/count_matrix.csv")
+colnames(countTable)<-c("gene_id","VMrep1","VMrep2","VMrep3","Trep1","Trep2","Trep3")
+rownames(countTable) <-countTable[,1]
+countTable$gene_id <- NULL
+
+condition <- data.frame(
+  condition<-c("VM","VM","VM","T","T","T"))
+rownames(condition) <-c("VMrep1","VMrep2","VMrep3","Trep1","Trep2","Trep3")
+ncol(countTable) == nrow(condition)
+  
+  
+dds<-DESeqDataSetFromMatrix(
+    countData=as.matrix(countTable),
+    design =~ condition,
+    colData=data.frame(
+      condition = c("VM","VM","VM","T","T","T")))
+```
+
+```{r}
+
+#specifying the reference level:
+
+dds$condition <- factor(dds$condition, levels = c("VM", "T"))
+dds$condition
+
+dds$condition <- relevel(dds$condition, ref = "VM")
+dds$condition
+
+```
+
+## Pre-filtering
+
+Here we perform a minimal pre-filtering to keep only rows that have at
+least 10 reads total. This will give an insight of what expression looks
+like across genes
+
+```{r}
+
+# sum counts for each gene across samples
+sumcounts <- rowSums(counts(dds))
+
+# take the log
+logsumcounts <- log(sumcounts,base=10)
+sprintf("Genes before filtering : %s",length(logsumcounts))
+
+# plot a histogram of the log scaled counts
+plot_without_filter <- hist(logsumcounts,breaks=100, main="Histogram of the log scaled counts")
+
+# get genes with summed counts greater than 10; remove lowly expressed genes
+keep <- sumcounts > 10
+
+# keep only the genes for which the vector "keep" is TRUE
+dds_filter <- dds[keep,]
+
+sumcounts <- rowSums(counts(dds_filter))
+# take the log
+logsumcounts <- log(sumcounts,base=10)
+# plot a histogram of the log scaled counts
+
+
+plot_with_filter <- hist(logsumcounts,breaks=100,main="Histogram of the log scaled counts \n keep only the genes with summed counts greater than 10" )
+```
+```{r}
+write.table(as.data.frame(rownames(dds_filter)),"/home/famgarcia/VM_vs_HDAC_DEA/filtered_VM_vs_T.csv", row.names=FALSE, quote=FALSE, col.names=FALSE)
+```
+
+## Run DESeq2 DEG analysis
+
+By running DESeq over the filtered HTSeqCount DESeq2 object, we will:
+
+-   **Normalize the count expression data** with the mean of ratios
+    method. This method accounts for biases in sequencing depth and gene
+    composition.
+
+-   **Estimate dispersion levels per gene**. ( Negative Binomial
+    distribution *see description of how DESeq2 performs this step
+    above* ).
+
+-   **Fit a Generalized Linear Model** to Log2FoldChange \~
+    log2(treatment/baseline expression) and perform hypothesis testing
+    of differential expression
+
+Create the DESeq data object:
+
+PlusP samples from each type of cell group is used as a reference level
+(control)
+
+```{r}
+
+# normalize and calculate dispersion
+dds <- DESeq(dds_filter) 
+
+plotDispEsts(dds, main="Dispersion plot")
+
+```
+
+# Get basic statisics about the number of significant genes
+
+A positive log2 fold change for a gene would mean that this gene is more
+abundant in treatment condition than in the control condition.
+
+Extracting the table of differential genes and Exploratory data analysis
+of RNAseq data with DESeq2 QC plots
+
+-   A log2 equal to 1 means that gene X has a higher expression (x2,
+    two-fold) in the treatment condition compared to the control
+    condition.
+
+-   A log2 equal to -1 means that gene X has a smaller expression in the
+    treatment condition.
+
+-   Example: untreated (control) = 230 treated= 750
+    log2(treated/untreated) \# equals 1.705257
+
+**Column Result Summary**
+
+baseMean: mean of normalized counts for all samples log2FoldChange: log2
+fold change lfcSE: standard error stat: Wald statistic pvalue: Wald test
+p-value padj: BH adjusted p-values multiple testing
+
+```{r}
+
+
+#Get basic statisics about the number of significant genes
+
+res <- results(dds, pAdjustMethod="BH") 
+
+resultsNames(dds)
+
+summary(res)
+
+# check out the first few lines
+
+head(res)
+
+mcols(res, use.names = T)
+
+
+```
+```{r}
+ressign<-subset(res,abs(log2FoldChange)>1)
+sprintf('genes with padj<0.05 and |LFC|>1 : %s', nrow(ressign[which((ressign$padj < 0.05) & (!is.na(ressign$padj))),]))
+sprintf('genes with padj<0.05 and LFC>1 (up) : %s', nrow(ressign[which((ressign$log2FoldChange>1 & ressign$padj < 0.05) & (!is.na(ressign$padj))),]))
+sprintf('genes with padj<0.05 and LFC<-1 (down) : %s', nrow(ressign[which((!ressign$log2FoldChange>1) & ressign$padj < 0.05 & (!is.na(ressign$padj))),]))
+```
+
+## CREATE OUTPUTS
+
+```{r}
+
+##Create normalized read counts
+normalized_counts <- counts(dds, normalized=TRUE)
+
+normalized_counts_mad <- apply(normalized_counts, 1, mad)
+normalized_counts <- normalized_counts[order(normalized_counts_mad, decreasing=T), ]
+
+
+#DESeq get results table - TOTAL RESULTS
+
+
+Res_A_X_total <- results(dds,
+name="condition_T_vs_VM",
+pAdjustMethod="BH")
+
+Res_A_X_total <- Res_A_X_total[order(Res_A_X_total$padj),]
+
+
+#########################
+# Query the mart/dataset
+#########################
+
+# see a list of "marts" available at host "plants.ensembl.org"
+listMarts <-listMarts(host="https://plants.ensembl.org")
+
+# create an object 
+mart <- useMart(biomart="plants_mart", host="https://plants.ensembl.org")
+
+# see a list of data sets within the mart
+
+listdatasets <- listDatasets(mart)
+(listDatasets(mart))[grep("bnapus",listDatasets(mart)[,1]),]
+
+# create an object for the plants_mart-Ensembl 
+
+bnapus_mart <- useMart(biomart = "plants_mart", host = "https://plants.ensembl.org", dataset = "bnapus_eg_gene"	)
+
+
+# see a list of all "attributes" available
+
+attributes <- listAttributes(mart = bnapus_mart, page="feature_page")
+attributes
+```
+
+```{r}
+
+
+# get gene names and transcript lengths when they exist
+ann <- getBM(filter="ensembl_gene_id",value=rownames(Res_A_X_total),attributes=c("ensembl_gene_id","chromosome_name", "external_gene_name","start_position", "end_position", "strand", "transcript_biotype","transcript_length", "description"),mart=bnapus_mart, useCache = FALSE)
+
+# pick only the longest transcript for each gene ID
+ann <- group_by(ann, ensembl_gene_id) %>% 
+  summarize(.,description=unique(description),transcript_length=max(transcript_length))
+
+# Reannotate transcripts
+go_ann <- getBM(filter="ensembl_gene_id",value=rownames(Res_A_X_total),attributes=c("ensembl_gene_id","chromosome_name", "external_gene_name","start_position", "end_position", "strand", "transcript_biotype","transcript_length", "description"),bnapus_mart, useCache = FALSE)
+
+
+nrow(Res_A_X_total)
+nrow(ann)
+
+
+Res_A_X_total <- data.frame(Res_A_X_total)
+Res_A_X_total  <- rownames_to_column(Res_A_X_total, var = "ensembl_gene_id")
+
+
+#nrow(ann)
+#nrow(Res_A_X_total)
+
+Res_A_X_total <-merge(Res_A_X_total,go_ann,by='ensembl_gene_id',all.x = TRUE, all.y = TRUE)
+
+#Export output files
+Res_A_X_total$sig <- ifelse(Res_A_X_total$padj <= 0.05, "yes", "no")
+
+Res_A_X_total_0.05 <-subset(Res_A_X_total, padj <=0.05)
+
+
+
+#dir.create(paste(directory,"/DE_results/",sep=""))
+write.table(normalized_counts,"/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Condition_T_vs_VM_normcounts.csv",quote=FALSE, sep=",")
+
+
+#Note on p-values set to NA: some values in the results table can be set to NA for one of the following reasons:
+
+#If within a row, all samples have zero counts, the baseMean column will be zero, and the log2 fold change estimates, p value and adjusted p value will all be set to NA.
+#If a row contains a sample with an extreme count outlier then the p value and adjusted p value will be set to NA. These outlier counts are detected by Cook’s distance. Customization of this outlier filtering and description of functionality for replacement of outlier counts and refitting is described below
+#If a row is filtered by automatic independent filtering, for having a low mean normalized count, then only the adjusted p value will be set to NA. Description and customization of independent filtering is described below
+```
+
+
+```{r}
+n_occur <- data.frame(table(Res_A_X_total$external_gene_name))
+Res_duplicated_GN <- Res_A_X_total[Res_A_X_total$external_gene_name %in% n_occur$Var1[n_occur$Freq > 1],]
+#sort dataframe
+Res_duplicated_GN<-Res_duplicated_GN[order(Res_duplicated_GN$external_gene_name),]
+listch <- Res_duplicated_GN$external_gene_name
+
+i<-0
+k<-0
+newlistch<-vector()
+for (gene in listch){
+  k=k+1
+  if(k==1){lastgene<-gene}
+  else{lastgene<-listch[k-1]}
+  
+  if (gene == lastgene){
+    i<-i+1
+    gene<-paste(gene, i, sep="_")
+    newlistch <- c(newlistch, gene)
+  }else{
+    i=1
+    gene<-paste(gene, i, sep="_")
+    newlistch <- c(newlistch, gene)
+    }
+}
+
+Res_duplicated_GN$external_gene_name <- newlistch
+
+Res_non_duplicated_GN <- Res_A_X_total[!Res_A_X_total$external_gene_name %in% n_occur$Var1[n_occur$Freq > 1],]
+
+Res_A_X_total_plot =rbind(Res_non_duplicated_GN, Res_duplicated_GN)
+
+
+```
+```{r}
+# Save file with sorted ranking score - Wald statistic for ranking
+rank_res <- Res_A_X_total_plot[,c(9,5)]
+write.table(rank_res[order(rank_res$stat,decreasing=TRUE),],"/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Rank_T_vs_VM.rnk", row.names = FALSE, sep=",", quote=FALSE, col.names=FALSE)
+```
+
+```{r}
+rownames(Res_A_X_total_plot)  <- Res_A_X_total_plot$external_gene_name
+```
+
+```{r}
+head(Res_A_X_total_plot)
+```
+
+## RNA-seq data quality assessment
+
+### Sample Clustering {.tabset .tabset-fade .tabset-pills}
+
+Hierarchical clustering RNA-seq gene expression patterns based on sample
+distance (Euclidean distance matrix) of log transformed expression from
+transcripts based on DeSeq2 (Love et al. 2014).
+
+```{r echo=, message=FALSE, warning=FALSE}
+# log transformed expression
+
+#This function transforms the count data to the log2 scale in a way which minimizes differences between samples for rows with small counts, and which normalizes with respect to library size. The rlog transformation produces a similar variance stabilizing effect as varianceStabilizingTransformation, though rlog is more robust in the case when the size factors vary widely. The transformation is useful when checking for outliers or as input for machine learning techniques such as clustering or linear discriminant analysis. rlog takes as input a DESeqDataSet and returns a RangedSummarizedExperiment object.
+
+rld <- rlog(dds, blind=FALSE)
+rlogMat <- assay(rld)
+rlogMat <- rlogMat[order(normalized_counts_mad, decreasing=T), ]
+
+# Generar color
+hmcol <- colorRampPalette(brewer.pal(9, "GnBu"))(100)
+
+ # Pearson correlation
+pearson_cor <- as.matrix(cor(rlogMat, method="pearson"))
+
+# Hierarchical clustering
+hc <- hcluster(t(rlogMat), method="pearson")
+
+svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Treecorr_ME_HDAC.svg")
+TreeC = as.dendrogram(hc, method="average")
+plot(TreeC,
+     main = "Sample Clustering-checking outliers ",
+     ylab = "Height")
+dev.off()
+
+#adjust plot margins
+#par(mar=c(7,4,9,2)+0.1) 
+
+svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/HeatmapRLDcorr_ME_HDAC.svg")
+heatmap.2(pearson_cor, Rowv=as.dendrogram(hc), symm=T,trace="none",
+col=hmcol, main="Pearson correlation of each
+sample")
+dev.off()
+```
+```{r}
+write.csv(pearson_cor, "/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/pearsonRLD_ME_HDAC.csv")
+```
+
+```{r}
+
+```
+
+
+```{r echo=, message=FALSE, warning=FALSE}
+
+# normalized, variance-stabilized transformed counts for visualization
+vsd <- vst(dds, blind=FALSE)
+
+svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/VST_PCA_ME_HDAC.svg")
+plotPCA(vsd, intgroup="condition") + geom_text(aes(label=name),vjust=-1) +  ggtitle("PCA Plot using variance stabilizing transformation data") + scale_x_continuous(limits = c(-100, 100))  +  scale_y_continuous(limits = c(-50, 50)) # change limits to fix figure dimensions
+dev.off()
+
+svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/RLD_PCA_ME_HDAC.svg")
+plotPCA(rld, intgroup="condition") + geom_text(aes(label=name),vjust=1.5) + ggtitle("PCA Plot using Regularized log  Transformation data") + scale_x_continuous(limits = c(-200, 200))  +  scale_y_continuous(limits = c(-100, 100)) # change limits to fix figure dimensions
+dev.off()
+
+pca_data <- plotPCA(rld, intgroup="condition", returnData=T)
+```
+
+```{r}
+listddsgenes <- rownames(dds)
+dds_new <- dds
+rownames(dds_new) <- rownames(Res_A_X_total_plot[match(listddsgenes,Res_A_X_total_plot$ensembl_gene_id),])
+
+```
+
+### PlotMA {.tabset .tabset-fade .tabset-pills}
+
+In DESeq2, the function plotMA shows the log2 fold changes attributable
+to a given variable over the mean of normalized counts for all the
+samples in the DESeqDataSet. Points will be colored red if the adjusted
+p value is less than 0.05. Points which fall out of the window are
+plotted as open triangles pointing either up or down.
+
+A standard Bland-Altman MA plot and a MA plot with shrunken LFC values
+will be plotted. In this latter plot, shrinkage of effect size (LFC
+estimates) is useful for visualization and ranking of genes. It is more
+useful visualize the MA-plot for the shrunken log2 fold changes, which
+remove the noise associated with log2 fold changes from low count genes
+without requiring arbitrary filtering thresholds. This helps to get more
+meaningful log2 fold changes for all genes independently of their
+expression level.
+
+```{r}
+# This plot gives an idea of the dispersion variability among genes that have high gene counts versus genes that do not. This will affect the LFC, which is why it is important to calculate a prior distribution with LFC that are expected not to change(for genes with high counts), and use it to shrink or predict new estimates of LFC values with reduced noise for genes with less counts.
+plotSparsity(dds_new)
+```
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE, fig.width=5, fig.height=5}
+svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/PMA_Standard_PE_HDAC.svg")
+plotMA(dds_new , alpha =0.05, main=("Standard Bland-Altman- MA Plot"))
+dev.off()
+
+resLFC <- lfcShrink(dds_new, coef="condition_T_vs_VM", type="apeglm")
+
+svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/PMA_ShrunkenME_HDAC.svg")
+#You can see that genes with low counts are now shrinked.                  
+plotMA(resLFC, alpha =0.05, ylim=c(-4,4) ,main= ("MA plot shrunken log2 fold changes"))
+dev.off()
+
+maplot = ggmaplot(resLFC, size = 1,
+                  palette = c("#e55c30", "#84206b", "#f6d746"),
+                  genenames = as.vector(rownames(resLFC)),
+                  legend="top", top = 15,font.label = c("bold", 6),
+                  font.legend = c("bold",12), font.main = "bold",
+                  xlab = "Log2 Mean Expression",  ylab="Log2 FC")
+svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/MAPLOT_ME_HDAC_better.svg")
+show(maplot)
+dev.off()
+```
+
+### Volcano plot {.tabset .tabset-fade .tabset-pills}
+
+For each gene, this plot shows the gene fold change on the x-axis
+against the p-value plotted on the y-axis.
+
+Here, we make use of a library called EnhancedVolcano which is available
+through Bioconductor and described extensively on its own GitHub page.
+
+First, we are going to "shrink" the log2 fold changes to remove the
+noise associated with fold changes coming from genes with low count
+levels. Shrinkage of effect size (LFC estimates) is useful for
+visualization and ranking of genes. This helps to get more meaningful
+log2 fold changes for all genes independently of their expression level.
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+# The main function is named after the package
+png("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/VolcanoEnhanced_ME_HDAC.png", res=300, height=30,width=30, units="cm")
+EnhancedVolcano(toptable = resLFC,      # We use the shrunken log2 fold change as noise associated with low count genes is removed 
+                x = "log2FoldChange",   # Name of the column in resLFC that contains the log2 fold changes
+                y = "padj",             # Name of the column in resLFC that contains the p-value
+                labSize = 2,
+                pCutoff = 0.05,
+                FCcutoff = 1,
+                xlim = c(-2, 4),
+                ylim = c(0,300),
+                title="Condition T vs. C", subtitle = NULL,
+                lab = rownames(resLFC)) 
+dev.off()
+
+# Gather Log-fold change and FDR-corrected pvalues from DESeq2 results
+
+## - Change pvalues to -log10 (1.3 = 0.05)
+data <- data.frame(gene = row.names(res),
+                   pval = -log10(res$padj), 
+                   lfc = res$log2FoldChange)
+
+# Remove any rows that have NA as an entry
+data <- na.omit(data)
+
+# Color the points which are up or down
+## If fold-change > 0 and pvalue > 1 (Increased significant)
+## If fold-change < 0 and pvalue > 1 (Decreased significant)
+data <- mutate(data, color = case_when(data$lfc > 1 & data$pval > 1.3 ~ "Increased",
+                                       data$lfc < -1 & data$pval > 1.3 ~ "Decreased",
+                                       abs(data$lfc) > 1 | data$pval < 1.3 ~ "nonsignificant"))
+
+png("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/VolcanoFiltering_ME_HDAC.png", res=300, height=20,width=20, units="cm")
+# Make a basic ggplot2 object with x-y values
+vol <- ggplot(data, aes(x = lfc, y = pval, color = color))
+
+# Add ggplot2 layers
+vol +   
+  ggtitle(label = "Volcano Plot", subtitle = "Colored by fold-change direction") +
+  geom_point(size = 2.5, alpha = 0.8, na.rm = T) +
+  scale_color_manual(name = "Directionality",
+                     values = c(Increased = "#008B00", Decreased = "#CD4F39", nonsignificant = "darkgray")) +
+  theme_bw(base_size = 14) + # change overall theme
+  theme(legend.position = "right") + # change the legend
+  xlab(expression(log[2]("Log2FoldChange"))) + # Change X-Axis label
+  ylab(expression(-log[10]("adjusted p-value"))) + # Change Y-Axis label
+  #geom_hline(xintercept = 1.3, colour = "darkgrey") + # Add p-adj value cutoff line
+  #geom_hline(yintercept = 1, colour = "darkgrey") + # Add p-adj value cutoff line
+  scale_y_continuous(trans = "log1p", oob = scales::squish_infinite, limits = c(0,400))# Scale yaxis due to large p-values
+
+dev.off()
+```
+
+### Pheatmap {.tabset .tabset-fade .tabset-pills}
+
+To preserve the order and mappings of the external_gene_names (which are
+more informative visually than ensemble_gene_ids) we will need to
+perform normalization on dds_new
+
+```{r}
+signi <- subset(Res_A_X_total_plot,padj <=0.05)
+signi <- subset(signi,log2FoldChange > 1 | log2FoldChange < -1)
+
+normalized_counts <- counts(dds_new, normalized=TRUE)
+normalized_counts_mad <- apply(normalized_counts, 1, mad)
+normalized_counts <- normalized_counts[order(normalized_counts_mad, decreasing=T), ]
+
+normcounts_A_X <- data.frame(normalized_counts)
+normcounts_A_X <- rownames_to_column(normcounts_A_X, var = "external_gene_name")
+allsig <- merge(normcounts_A_X, signi,by='external_gene_name')
+
+```
+
+```{r}
+sigCounts <- allsig[, 2:7] 
+
+row.names(sigCounts) <- allsig$Row.names
+
+# get the top 20 genes by shrunken log2 fold change
+top20 <- order(-abs(resLFC$log2FoldChange))[1:20]
+resLFC[top20,]
+
+
+# negative log-scaled adjusted p-values
+log_padj <- -log(resLFC$padj,10)
+log_padj[log_padj > 100] <- 100
+
+
+# get top 20 log fold change genes
+top20 <- order(-abs(resLFC$log2FoldChange))[1:100]
+df <- data.frame(colData(dds_new)[,"condition"])
+	rownames(df) <- colnames(dds_new)
+	colnames(df) <- "condition"
+	
+top20symbols <- subset(Res_A_X_total_plot, ensembl_gene_id %in% rownames(assay(rld)[top20,]))$external_gene_name
+
+df_to_plot <- assay(rld)[top20,]
+rownames(df_to_plot) <- top20symbols
+
+png("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/top100_ME_HDAC.png", res=300, height=40,width=13, units="cm")
+
+pheatmap(
+	df_to_plot, 
+	cluster_rows=TRUE, 
+	show_rownames=TRUE,
+	cluster_cols=TRUE,
+	annotation_col=df,
+	fontsize_row = 8, 
+	main= ("Clustering using top 100 log fold change genes")
+	)
+dev.off()
+```
+```{r}
+resLFC <- lfcShrink(dds, coef="condition_T_vs_VM", type="apeglm")
+genelist <- rownames(resLFC)
+lfc_df = as.data.frame(resLFC[,2])
+lfc_df$ensembl_gene_id = genelist
+rownames(lfc_df) <- NULL  
+colnames(lfc_df) <-c("lfcShrink","ensembl_gene_id")
+
+final_df <- merge(Res_A_X_total_plot,lfc_df, by = "ensembl_gene_id")
+
+write.table(final_df,"/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Final_Condition_T_vs_VM_total.tsv", quote=FALSE, sep="\t", row.names = FALSE)
+
+final_df_filtered <- subset(subset(final_df, padj<0.05),abs(log2FoldChange)>1)
+
+write.table(final_df_filtered,"/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Final_Condition_T_vs_VM_LFC1_padj05.tsv", quote=FALSE, sep="\t", row.names = FALSE)
+```
+# GO enrichment analysis
+
+Gene Ontology ORA analysis using clusterProfiler
+
+From a list of genes to biological insights
+
+Over Representation Analysis (ORA)
+
+Over Representation Analysis is searching for biological functions or
+pathways that are enriched in a list obtained through experimental
+studies compared to the complete list of functions/pathways.
+
+The GO resource is divided into 3 main subdomains:
+
+Biological Process (BP): a series of molecular events with a defined
+beginning and end relevant for the function of an organism, a cell, etc.
+Cellular Component (CC): the part of a cell. Molecular Function (MF):
+the enzymatic activites of a gene product.
+
+```{r}
+library("biomartr")
+library("clusterProfiler")
+library("tidyverse")
+library("enrichplot")
+suppressPackageStartupMessages(library("org.At.tair.db"))
+#library("biomaRt")  # only use to remove cache bug
+
+biomartr::organismBM(organism = "Brassica napus")
+
+arabido_attributes = 
+  biomartr::organismAttributes("Brassica napus") %>% 
+  filter(dataset == "bnapus_eg_gene")
+arabido_attributes
+
+attributes_to_retrieve = c("tair_symbol", "entrezgene_id")
+```
+
+```{r}
+head(Res_A_X_total)
+```
+The shrinked Log2FoldValues will serve as a reference for subsetting and filtering DEG by 2-fold change of expression (|LFCShrink|>1). This will take into account variation in genes with low LFC values with the prior distribution calculated upon high LFC genes, and thereby have a more conservative view of what genes are significantly differentially expressed.
+```{r}
+# building the universe!
+
+# we want the correspondence of TAIR/Ensembl symbols with NCBI Entrez gene ids
+attributes_to_retrieve = c("uniprotswissprot","entrezgene_id")
+
+resLFC <- lfcShrink(dds, coef="condition_T_vs_VM", type="apeglm")
+write.csv(resLFC[which(resLFC$padj<0.05),], "/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Condition_T_vs_VM_LFCshirnkresults_padj_0.05.csv")
+signi <- subset(resLFC,padj <=0.05)
+signi <- subset(signi, log2FoldChange >=1 | log2FoldChange <=-1)
+
+# Query the Ensembl API
+all_arabidopsis_genes_annotated <- biomartr::biomart(genes = Res_A_X_total[,1], mart= "plants_mart",   dataset = "bnapus_eg_gene",  attributes = attributes_to_retrieve , filters =  "ensembl_gene_id")  
+# for compatibility with enrichGO universe
+# genes in the universe need to be characters and not integers (Entrez gene id)
+all_arabidopsis_genes_annotated$entrezgene_id = as.character(
+  all_arabidopsis_genes_annotated$entrezgene_id)
+```
+
+
+```{r}
+# retrieving NCBI Entrez gene id for our genes called differential
+signi_genes_annotated<- biomartr::biomart(genes = rownames(signi),                  # genes were retrieved using biomartr::getGenome()
+                                mart = "plants_mart",                     # marts were selected with biomartr::getMarts()
+                                dataset = "bnapus_eg_gene",               # datasets were selected with biomartr::getDatasets()
+                                attributes = attributes_to_retrieve,            # attributes were selected with biomartr::getAttributes()
+                                filters =   "ensembl_gene_id" )# query key
+head(signi_genes_annotated)  
+
+
+```
+
+```{r}
+library(AnnotationHub)
+# Retrieve record for Brassica napus OrgDb (NCBI gene ID annotations based on Brassica napus)
+ah <- AnnotationHub()
+AnnotationHub::query(ah, c("Brassica", "napus"))
+# Bnapus OrgDb will be provided with the object AH107389
+Bnapus <- ah[["AH107389"]]
+```
+
+```{r}
+# performing the ORA for Gene Ontology Biological Process class
+ora_analysis_bp <- enrichGO(gene = signi_genes_annotated$entrezgene_id, 
+                            universe = all_arabidopsis_genes_annotated$entrezgene_id, 
+                            OrgDb = Bnapus,  
+                            keyType = "ENTREZID",
+                            ont = "BP",              # either "BP", "CC" or "MF",
+                            pAdjustMethod = "BH",
+                            qvalueCutoff = 0.05,
+                            readable = TRUE, 
+                            pool = FALSE)
+
+
+
+ora_analysis_bp_simplify <- clusterProfiler::simplify(ora_analysis_bp, cutoff=0.6, by="p.adjust", select_fun=min)
+
+ora_analysis_bp_df <- ora_analysis_bp@result  %>% tibble::rownames_to_column("GO") %>% filter(p.adjust<=0.05)
+readr::write_csv(ora_analysis_bp_df, "Condition_T_vs_C_Bnapus_bp_analysis_res_.csv")
+
+DT::datatable(ora_analysis_bp_df, class = 'cell-border stripe', editable = TRUE,extensions = 'Buttons', options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print')), filter = "top", rownames = F)
+
+barplot(ora_analysis_bp_simplify, 
+        drop = TRUE, 
+        showCategory = 10, 
+        title = "GO Biological Process",
+        font.size = 8)
+```
+
+```{r}
+# performing the ORA for Gene Ontology Biological Process class
+ora_analysis_bp <- enrichGO(gene = signi_genes_annotated$entrezgene_id, 
+                            universe = all_arabidopsis_genes_annotated$entrezgene_id, 
+                            OrgDb = Bnapus,  
+                            keyType = "ENTREZID",
+                            ont = "CC",              # either "BP", "CC" or "MF",
+                            pAdjustMethod = "BH",
+                            qvalueCutoff = 0.05,
+                            readable = TRUE, 
+                            pool = FALSE)
+
+
+
+ora_analysis_bp_simplify <- clusterProfiler::simplify(ora_analysis_bp, cutoff=0.6, by="p.adjust", select_fun=min)
+
+ora_analysis_bp_df <- ora_analysis_bp@result  %>% tibble::rownames_to_column("GO") %>% filter(p.adjust<=0.05)
+readr::write_csv(ora_analysis_bp_df, "Condition_T_vs_C_Bnapus_cc_analysis_res_.csv")
+
+DT::datatable(ora_analysis_bp_df, class = 'cell-border stripe', editable = TRUE,extensions = 'Buttons', options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print')), filter = "top", rownames = F)
+
+barplot(ora_analysis_bp_simplify, 
+        drop = TRUE, 
+        showCategory = 10, 
+        title = "GO Cellular Component",
+        font.size = 8)
+```
+
+```{r}
+# performing the ORA for Gene Ontology Biological Process class
+ora_analysis_bp <- enrichGO(gene = signi_genes_annotated$entrezgene_id, 
+                            universe = all_arabidopsis_genes_annotated$entrezgene_id, 
+                            OrgDb = Bnapus,  
+                            keyType = "ENTREZID",
+                            ont = "MF",              # either "BP", "CC" or "MF",
+                            pAdjustMethod = "BH",
+                            qvalueCutoff = 0.05,
+                            readable = TRUE, 
+                            pool = FALSE)
+
+
+
+ora_analysis_bp_simplify <- clusterProfiler::simplify(ora_analysis_bp, cutoff=0.6, by="p.adjust", select_fun=min)
+
+ora_analysis_bp_df <- ora_analysis_bp@result  %>% tibble::rownames_to_column("GO") %>% filter(p.adjust<=0.05)
+readr::write_csv(ora_analysis_bp_df, "Condition_T_vs_C_Bnapus_mf_analysis_res_.csv")
+
+DT::datatable(ora_analysis_bp_df, class = 'cell-border stripe', editable = TRUE,extensions = 'Buttons', options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print')), filter = "top", rownames = F)
+
+barplot(ora_analysis_bp_simplify, 
+        drop = TRUE, 
+        showCategory = 10, 
+        title = "GO Molecular Function",
+        font.size = 8)
+```
