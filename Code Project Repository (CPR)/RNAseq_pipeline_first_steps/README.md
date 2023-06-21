@@ -1,4 +1,4 @@
-The contents of this folder include a series of utility scripts and general scripts to conduct the RNASeqPipeline with Paired End (PE) sequencing data
+The contents of this folder include a series of utility scripts and general scripts to conduct a RNA-Seq analysis pipeline with Paired End (PE) sequencing data in _Brassica napus_.
 
 | Code  | Pipeline step  | Description |  Usage  |
 |---|---|---|---|
@@ -10,7 +10,7 @@ The contents of this folder include a series of utility scripts and general scri
 Utility functions
 
 | Code  | Description |
-|---|---|---|
+|---|---|
 | `QC.sh`  | Calls fastqc to perform quality check of fastq files | 
 | `mergeCounts.sh`  |  Merges counts before normalization  |  
 | `NormalizeCountsR` |  Uses gene length file and merged counts csv to calculate TPM / FPKM  |  
