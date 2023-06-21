@@ -4,5 +4,5 @@ As an additional informative way to get insight from the transcriptomic data, a 
 
 Code in this section
 
-- batch_correction.R : analyses and use of Combat-Seq to perform batch correction adjusting for a biological replicate.
-- WGCNA.R : performs cleaning preprocessing steps from adjusted Combat-seq raw count, normalization and weighted conetwork analysis --> selection of hub genes and modules related to VM/PE/SAHA trait
+- `batch_correction.R` : analyses and use of Combat-Seq to perform batch correction adjusting for a biological replicate.
+- `WGCNA.R` : performs cleaning preprocessing steps from adjusted Combat-seq raw count, normalization and weighted conetwork analysis --> selection of hub genes and modules related to VM/PE/SAHA trait
