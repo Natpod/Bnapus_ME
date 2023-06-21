@@ -11,7 +11,7 @@ NC='\033[0m'
 
 echo -e "\n${GREEN} ~~~~~~~~~~~~ read_count.sh ~~~~~~~~~~~~\n${NC}"
 echo -e "A script for read count using HISAT read alignment output BAM files"
-echo -e "\n\n ${GREEN} USAGE : ${NC} bash download_map_assemble.sh ${GREEN} \n\tpath_to_bam and genome files are provided in user input.${NC}"
+echo -e "\n\n ${GREEN} USAGE : ${NC} bash read_count.sh ${GREEN} \n\tpath_to_bam and genome files are provided in user input.${NC}"
 
 help(){
 echo -e echo -e "\n${GREEN} ~~~~~~~~~~~~ read_count.sh ~~~~~~~~~~~~\n${NC} USAGE : path_to_bam and genome files are provided in user input\n bam directory required can optionally contain custom indexes."
