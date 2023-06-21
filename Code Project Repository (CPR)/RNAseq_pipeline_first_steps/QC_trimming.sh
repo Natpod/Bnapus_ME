@@ -89,6 +89,9 @@ NC='\033[0m'
 
 wdir=$(pwd)
 
+# Message after script launch
+echo -e "~~~~~~~~~QC_trimming.sh~~~~~~~\nUI Script to \n\t1)trim RNA-seq experiment reads (adapters, PhredQ score<5, uniform reads, N bases>10) \n\t2)perform fastqc + fastp html reports of quality checks before and after trimming\n-----------------------"
+
 # ENTER INPUT AND OUTPUT DIRECTORIES
 
 #Asking for sequencing file user input
