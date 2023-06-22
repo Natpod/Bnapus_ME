@@ -9,3 +9,4 @@ Prupose : Identifying Differentially Expressed Genes (DEGs) from:
 |---|---|---|
 | `DESEQ2_DE_analysis.Rmd` |  Differential expression  | DEA analysis for points 2 and 3 |
 | `DESEQ_DE_analysis.Rmd` | Differential expression  | DEA analysis for 1  |
+| `DEG_exploratory_analysis.R`| Analysis of DEA results | makes Venn Diagrams for all 1/2/3 DEG point combinations, and between 1/2 segmented by type of expression|
