@@ -14,6 +14,7 @@ BiocManager::install("biomaRt")
 BiocManager::install("biomartr")
 BiocManager::install("org.Mm.eg.db")
 BiocManager::install("minet")
+remotes::install_github("jtlovell/limmaDE2") # requires install.packages("venneuler")  as a dependency
 
 #remotes::install_github("kevinblighe/CorLevelPlot")
 #install.packages("WGCNA", dependencies = TRUE)
@@ -29,15 +30,47 @@ library(gridExtra)
 library(reshape)
 library(ggplot2)
 library(ggpubr)
+library(igraph)
+library("ggVennDiagram") # requires c pckg - libudunits2-dev, libgdal-dev, units, sf CRAN packages
+library("AnnotationDbi")
+library("AnnotationHub")
 
+######################################################
+# Load bnapus object
+######################################################
 
-
-
+# Making annotation package
+ah <- AnnotationHub()
+#Ensembl 56
+query(ah, c( "OrgDb", "Brassica napus"))
+org.Brassicanapus.eg.db <- ah[["AH107389"]]
 
 #############################################################
+# Load ncbi annotations
+annot_ncbi=read.table("/home/famgarcia/Escritorio/ncbi_centric_annotations.tsv", sep="\t", header=TRUE)
+
+# Load DEA data - necessary to filter lists and make coexpressed gene output findings more robust
+
+expr_HDAC <- read.csv("/home/famgarcia/T_vs_C_DEA/Final_Condition_T_vs_C_LFC1_padj05.csv")
+expr_HDAC_Stress <- read.csv("/home/famgarcia/Escritorio/Condition_T_vs_VM_result_padj_0.05_DevStage.csv")
+expr_Stress <- read.csv("/home/famgarcia/Escritorio/Condition_PEall_vs_VM_result_padj_0.05_DevStage.csv")
+
+# preprocessing : taking index out, filtering by LFC>1, taking external gene name log2FC and padj only
+attr_retrieve = c("external_gene_name", "log2FoldChange", "padj")
+expr_HDAC <- expr_HDAC[,colnames(expr_HDAC) %in% attr_retrieve]
+expr_HDAC_Stress <- expr_HDAC_Stress[,colnames(expr_HDAC_Stress) %in% attr_retrieve]
+expr_Stress <- expr_Stress[,colnames(expr_Stress) %in% attr_retrieve]
+
+# log2FoldChange>2 is considered a DEG
+expr_HDAC <- expr_HDAC[abs(expr_HDAC$log2FoldChange) >1, ]
+expr_HDAC_Stress <- expr_HDAC_Stress[abs(expr_HDAC_Stress$log2FoldChange) >1, ]
+expr_Stress <- expr_Stress[abs(expr_Stress$log2FoldChange) >1, ]
+
+################
+# MAIN
+################
 
 
-# Repeat for Development Stage covariate batch adjustment
 
 
 # 1. Fetch Data ------------------------------------------------
@@ -169,25 +202,31 @@ sft <- pickSoftThreshold(norm.counts,
 
 
 sft.data <- sft$fitIndices
+sft.data$color=ifelse(sft.data$Power ==12, "red", "black")
 
 # visualization to pick power
 
-a1 <- ggplot(sft.data, aes(Power, SFT.R.sq, label = Power)) +
+a1 <- ggplot(sft.data, aes(Power, SFT.R.sq, label = Power, color=color)) +
   geom_point() +
-  geom_text(nudge_y = 0.1) +
+  geom_text(size=2.5,nudge_y = 0.1) +
   geom_hline(yintercept = 0.8, color = 'red') +
-  labs(x = 'Power', y = 'Scale free topology model fit, signed R^2') +
-  theme_classic()
+  labs(x = 'Power', y = bquote('Scale free topology model fit, signed '~R^2) ) +
+  scale_color_manual(values=c('black','red')) +
+  theme(legend.position = "none") +
+  theme_classic(base_size = 7) + guides(color="none")
 
 
-a2 <- ggplot(sft.data, aes(Power, mean.k., label = Power)) +
-  geom_point() +
-  geom_text(nudge_y = 0.1, vjust = 1) +
+a2 <- ggplot(sft.data, aes(Power, mean.k., label = Power, color=color)) +
+  geom_point( show.legend = FALSE ) +
+  geom_text(size=2.5, nudge_y = 0.1, vjust = -2, show.legend = FALSE) +
   labs(x = 'Power', y = 'Mean Connectivity') +
-  theme_classic()
+  scale_color_manual(values=c('black','red')) +
+  theme(legend.position = "none") +
+  theme_classic(base_size = 7)
 
-
-grid.arrange(a1, a2, nrow = 2)
+png("/home/famgarcia/Escritorio/NTA_softthreshold_options.png", width=24, height=7, units="cm", res=300)
+grid.arrange(a1, a2, ncol = 2)
+dev.off()
 
 
 # convert matrix to numeric
@@ -204,13 +243,14 @@ bwnet <- blockwiseModules(norm.counts,
                           minModuleSize = 30,
                           maxPOutliers = 0.05,
                           maxBlockSize = 8000,
+                          networkType = "signed",
                           TOMType = "signed",
                           corType="bicor",
                           power = soft_power,
                           mergeCutHeight = 0.25,
                           numericLabels = FALSE,
                           saveTOMs = TRUE,
-                          saveTOMFileBase = "/home/famgarcia/TFM/TOM_DS_COV",
+                          #saveTOMFileBase = "/home/famgarcia/TFM/TOM_DS_COV",
                           randomSeed = 1234,
                           verbose = 3)
 
@@ -284,12 +324,12 @@ sign_colors = gsub("ME", "",sign_modules)
 
 
 x11(type="cairo")
-png("/home/famgarcia/Escritorio/modcorr.png", width=18, height=25, units="cm", res=300)
-par(mar=c(7,7,0.5,2))
+png("/home/famgarcia/Escritorio/modcorr_signednet.png", width=18, height=25, units="cm", res=300)
+par(mar=c(8,8,0.5,1.5))
 labeledHeatmap(Matrix=module.trait.corr[,],
-               xLabels=t(as.data.frame(names(heatmap.data)[c(22,23,24)])),
-               yLabels=names(heatmap.data)[1:21],
-               ySymbols=gsub("ME","",names(heatmap.data)[1:21]),
+               xLabels=t(as.data.frame(names(heatmap.data)[c(21,22,23)])),
+               yLabels=names(heatmap.data)[1:20],
+               ySymbols=gsub("ME","",names(heatmap.data)[1:20]),
                colorLabels = FALSE,
                colors=blueWhiteRed(50),
                textMatrix=textMatrix,
@@ -298,23 +338,43 @@ labeledHeatmap(Matrix=module.trait.corr[,],
                zlim=c(-1,1)) + geom_raster() + scale_fill_identity()
 dev.off()
 
-# black turquoise and greenyellow modules are of biological interest to compare PEHDAC / PECtrl sign modules
-# brown, blue, midnight blue might be informative to analyze coexpression clusters in Vacuolated Microspores before embryogenesis
+# lightyellow module is of biological interest to analyze SAHA treatment effects on corregulation network (significant module associated to that trait)
+# grey60 module is of biological interest to give insights of coexpression in Control Proembryos
+# brown, grey60, turquoise blue yellow might be informative to analyze coexpression clusters in Vacuolated Microspores before embryogenesis
 
 
-
+# Control Proembryos
 module.gene.mapping <- as.data.frame(bwnet$colors)
-module.gene.mapping %>% 
-  filter(`bwnet$colors` == 'turquoise') %>% 
+grey60_genes = module.gene.mapping %>% 
+  filter(`bwnet$colors` == 'grey60') %>% 
   rownames()
 
-black_gid <- module.gene.mapping %>% 
-  filter(`bwnet$colors` == 'black') %>% 
+grey60_genes = as.data.frame(grey60_genes)
+colnames(grey60_genes) ="entrezgene_id"
+merge(grey60_genes,annot_ncbi[!duplicated(annot_ncbi$entrezgene_id),], by="entrezgene_id")
+
+
+# SAHA Proembryos
+lightyellow_genes = module.gene.mapping %>% 
+  filter(`bwnet$colors` == 'lightyellow') %>% 
   rownames()
 
-brown_gid <- module.gene.mapping %>% 
+lightyellow_genes = as.data.frame(lightyellow_genes)
+colnames(lightyellow_genes) ="entrezgene_id"
+merge(lightyellow_genes,annot_ncbi[!duplicated(annot_ncbi$entrezgene_id),], by="entrezgene_id")
+
+
+# Vacuolated Microspores
+brown_genes = module.gene.mapping %>% 
   filter(`bwnet$colors` == 'brown') %>% 
   rownames()
+
+brown_genes = as.data.frame(brown_genes)
+colnames(brown_genes) ="entrezgene_id"
+merge(brown_genes,annot_ncbi[!duplicated(annot_ncbi$entrezgene_id),], by="entrezgene_id")
+
+
+
 
 
 #  GENE SIGNIFICANCE MODULE MEMBERSHIP ----------------------
@@ -340,25 +400,6 @@ GSPvalue = as.data.frame(corPvalueStudent(as.matrix(geneTraitSignificance), nSam
 
 module.membership.measure.pvals[1:10,1:10]
 
-# Plot for modules of interest?
-modNames = rownames(module.membership.measure)
-module = "brown"
-column = match(paste("ME",module,sep=""), modNames);
-associated_mod_genes <- module.gene.mapping %>% 
-  filter(`bwnet$colors` == 'brown') %>% 
-  rownames()
-
-moduleGenes <- which(colnames(module.membership.measure) %in% associated_mod_genes)
-sizeGrWindow(7, 7);
-par(mfrow = c(1,1));
-verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
-                   abs(geneTraitSignificance[moduleGenes, column]),
-                   xlab = paste("Module Membership in", module, "module"),
-                   ylab = "Gene significance for body weight",
-                   main = paste("Module membership vs. gene significance\n"),
-                   cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
-
-
 
 
 # II. GENE SIGNIFICANCE  -------------------------------------------
@@ -368,51 +409,70 @@ verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
 
 ################### SAHA TREATMENT
 
+# Plot for modules of interest?
+
+
 gene.signf.corr <- cor(norm.counts, traits$SAHA_Proembryos, use = 'p')
 gene.signf.corr.pvals <- corPvalueStudent(gene.signf.corr, nSamples)
 gene.signf.corr.pvals <- as.data.frame(gene.signf.corr.pvals)
-
-
-verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
-                   abs(gene.signf.corr[moduleGenes, 1]),
-                   xlab = paste("Module Membership in", module, "module"),
-                   ylab = "Gene significance for body weight",
-                   main = paste("Module membership vs. gene significance\n"),
-                   cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
-
-
-
-
 colnames(gene.signf.corr.pvals)=c("pvalue")
 significant_genes_treatment = subset(gene.signf.corr.pvals, pvalue<=0.01)
+
+# Plot correlation between module membership and trait significance in hub genes
+modNames = rownames(module.membership.measure)
+module = "lightyellow"
+  column = match(paste("ME",module,sep=""), modNames);
+  associated_mod_genes <- module.gene.mapping %>% 
+    filter(`bwnet$colors` == 'lightyellow') %>% 
+    rownames()
+png("/home/famgarcia/TFM/wgcna/mm_traitCPE_lightyellow.png", width=15, height=10, units="cm", res=250)
+par(mar=c(5,5,2.6,3))
+verboseScatterplot(abs(module.membership.measure[column, associated_mod_genes]),
+                   abs(gene.signf.corr[associated_mod_genes, 1]),
+                   xlab = "Module Membership in lightyellow module",
+                   ylab = "Gene significance \nfor Ctrl Proembryos",
+                   main = paste("Module membership vs. trait gene significance\n"),
+                   cex.main = 1, cex.lab = 0.9, cex.axis = 0.9, col = '#FBEC5D') +theme(axis.title.x = element_text("Module Membership in grey60 module", size=7))+ theme_bw(base_size=4)
+dev.off()
+
+
 
 ################## DEVELOPMENTAL STAGE - Ctrl proembryos
 
 gene.signf.corr <- cor(norm.counts, traits$Ctrl_Proembryos, use = 'p')
 gene.signf.corr.pvals <- corPvalueStudent(gene.signf.corr, nSamples)
-
-
-verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
-                   abs(gene.signf.corr[moduleGenes, 1]),
-                   xlab = paste("Module Membership in", module, "module"),
-                   ylab = "Gene significance for body weight",
-                   main = paste("Module membership vs. gene significance\n"),
-                   cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
-
-
-
-
 gene.signf.corr.pvals <- as.data.frame(gene.signf.corr.pvals)
 colnames(gene.signf.corr.pvals)=c("pvalue")
-
 significant_genes_stagedev_PE = subset(gene.signf.corr.pvals, pvalue<=0.01)
 significant_genes_stagedev_PE$entrezgene_id = rownames(significant_genes_stagedev_PE)
 significant_genes_stagedev_PE =significant_genes_stagedev_PE[order(significant_genes_stagedev_PE$pvalue),]
 
-################## DEVELOPMENTAL STAGE - Ctrl proembryos
+modNames = rownames(module.membership.measure)
+module = "grey60"
+  column = match(paste("ME",module,sep=""), modNames);
+  associated_mod_genes <- module.gene.mapping %>% 
+    filter(`bwnet$colors` == 'grey60') %>% 
+    rownames()
+
+png("/home/famgarcia/TFM/wgcna/mm_traitCPE_grey60.png", width=15, height=10, units="cm", res=250)
+par(mar=c(5,5,2.6,3))
+verboseScatterplot(abs(module.membership.measure[column, associated_mod_genes]),
+                   abs(gene.signf.corr[associated_mod_genes, 1]),
+                   xlab = "Module Membership in grey60 module",
+                   ylab = "Gene significance \nfor Ctrl Proembryos",
+                   main = paste("Module membership vs. trait gene significance\n"),
+                   cex.main = 1, cex.lab = 0.9, cex.axis = 0.9, col = module) +theme(axis.title.x = element_text("Module Membership in grey60 module", size=7))+ theme_bw(base_size=4)
+dev.off()
+
+
+
+################## DEVELOPMENTAL STAGE - VM
 
 gene.signf.corr <- cor(norm.counts, traits$Vacuolated_Micrp, use = 'p')
 gene.signf.corr.pvals <- corPvalueStudent(gene.signf.corr, nSamples)
+gene.signf.corr.pvals <- as.data.frame(gene.signf.corr.pvals)
+colnames(gene.signf.corr.pvals)=c("pvalue")
+significant_genes_stagedev_VM = subset(gene.signf.corr.pvals, pvalue<=0.01)
 
 
 verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
@@ -423,10 +483,7 @@ verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
                    cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
 
 
-gene.signf.corr.pvals <- as.data.frame(gene.signf.corr.pvals)
-colnames(gene.signf.corr.pvals)=c("pvalue")
 
-significant_genes_stagedev_VM = subset(gene.signf.corr.pvals, pvalue<=0.01)
 
 write.table(rownames(significant_genes_stagedev_VM), "hub_VM.tsv", sep="\t", row.names=FALSE, quote=FALSE, col.names = FALSE)
 write.table(rownames(significant_genes_stagedev_PE), "hub_PEC.tsv", sep="\t", row.names=FALSE, quote=FALSE, col.names = FALSE)
@@ -437,51 +494,132 @@ write.table(rownames(significant_genes_treatment), "hub_SAHA.txt", sep="\t", row
 # Annotate results
 
 
-significant_genes_stagedev$entrezgene_id = rownames(significant_genes_stagedev)
-significant_genes_treatment$entrezgene_id = rownames(significant_genes_treatment)
-rownames(significant_genes_stagedev) = NULL
-rownames(significant_genes_treatment) = NULL
+Normalized_val = read.csv("/home/famgarcia/Escritorio/VST_norm_counts.csv", sep=" ")
+Normalized_val$entrezgene_id = rownames(Normalized_val)
+rownames(Normalized_val) <- NULL
+
 
 # NCBI GENE DESCRIPTIONS
 
-º# Expr log2fc among SAHA treated PE - Control PE
+# Expr log2fc among SAHA treated PE - Control PE
+significant_genes_treatment$entrezgene_id = rownames(significant_genes_treatment)
+rownames(significant_genes_treatment) = NULL
 hub_PEall = as.data.frame(significant_genes_stagedev_PE)
 putative_hubgenes_involved_development = merge(hub_PEall,annot_ncbi, by='entrezgene_id')
 putative_hubgenes_involved_development = putative_hubgenes_involved_development[order(putative_hubgenes_involved_development$pvalue),]
 
+tmp_GO = select(org.Brassicanapus.eg.db, as.character(putative_hubgenes_involved_development$entrezgene_id), c("GO" , "ONTOLOGY", "GENENAME"), "ENTREZID")
+tmp_GO = tmp_GO[tmp_GO$ONTOLOGY=="BP",]
+xx <- as.list(tmp_GO$GO)
+list_terms = c()
+for (i in 1:length(xx)){
+  if (!is.na(xx[[i]])) { 
+    list_terms=c(list_terms,  as.character( Term( xx[[i]] ) )) }
+  else{list_terms =c(list_terms, "")}
+} 
+tmp_GO$GOTERM = list_terms
+tmp_GO= tmp_GO[!is.na(tmp_GO$GO),]
+putative_hubgenes_involved_development = merge(tmp_GO, putative_hubgenes_involved_development, by.x="ENTREZID", by.y="entrezgene_id", all.y=TRUE)
+expr_phgenes_treatment = merge(putative_hubgenes_involved_development, expr_HDAC_Stress, by="external_gene_name")
+expr_phgenes_treatment = expr_phgenes_treatment[order(expr_phgenes_treatment$pvalue),]
 
-expr_phgenes_dev = merge(putative_hubgenes_involved_development, expr_Stress, by="external_gene_name")
-expr_phgenes_dev = expr_phgenes_dev[order(expr_phgenes_dev$pvalue.x),]
+expr_phgenes_treatment = merge(expr_phgenes_treatment, Normalized_val, by.x="ENTREZID", by.y="entrezgene_id")
+write.table(expr_phgenes_treatment, "/home/famgarcia/Escritorio/hub_Stress_PEall.tsv", sep="\t", row.names=FALSE, quote=FALSE)
 
-write.table(expr_phgenes_dev, "hub_Stress_PEall.tsv", sep="\t", row.names=FALSE, quote=FALSE)
-
-
-
+######################## VM hub genes
 
 hub_VM = as.data.frame(significant_genes_stagedev_VM)
 hub_VM$entrezgene_id = rownames(hub_VM)
 putative_hubgenes_involved_development = merge(hub_VM,annot_ncbi, by='entrezgene_id')
 putative_hubgenes_involved_development = putative_hubgenes_involved_development[order(putative_hubgenes_involved_development$pvalue),]
 
+tmp_GO = select(org.Brassicanapus.eg.db, as.character(putative_hubgenes_involved_development$entrezgene_id), c("GO" , "ONTOLOGY", "GENENAME"), "ENTREZID")
+tmp_GO = tmp_GO[tmp_GO$ONTOLOGY=="BP",]
+xx <- as.list(tmp_GO$GO)
+list_terms = c()
+for (i in 1:length(xx)){
+  if (!is.na(xx[[i]])) { 
+    list_terms=c(list_terms,  as.character( Term( xx[[i]] ) )) }
+  else{list_terms =c(list_terms, "")}
+} 
+tmp_GO$GOTERM = list_terms
+tmp_GO= tmp_GO[!is.na(tmp_GO$GO),]
+putative_hubgenes_involved_development = merge(tmp_GO, putative_hubgenes_involved_development, by.x="ENTREZID", by.y="entrezgene_id", all.y=TRUE)
+
 
 expr_phgenes_dev = merge(putative_hubgenes_involved_development, expr_Stress, by="external_gene_name")
-expr_phgenes_dev = expr_phgenes_dev[order(expr_phgenes_dev$pvalue.x),]
+expr_phgenes_dev = expr_phgenes_dev[order(expr_phgenes_dev$pvalue),]
+expr_phgenes_treatment = merge(expr_phgenes_dev, Normalized_val, by.x="ENTREZID", by.y="entrezgene_id")
 
-write.table(expr_phgenes_dev, "hub_Stress_VM.tsv", sep="\t", row.names=FALSE, quote=FALSE)
+write.table(expr_phgenes_treatment, "/home/famgarcia/Escritorio/hub_Stress_VM.tsv", sep="\t", row.names=FALSE, quote=FALSE)
 
 
-
+######## SAHA treatment
 
 hub_SAHA = as.data.frame(significant_genes_treatment)
 hub_SAHA$entrezgene_id = rownames(hub_SAHA)
+rownames(hub_SAHA) <- NULL
 putative_hubgenes_involved_treatment = merge(hub_SAHA,annot_ncbi, by='entrezgene_id')
-expr_phgenes_dev_treatment = merge(putative_hubgenes_involved_treatment, expr_HDAC, by="external_gene_name")
-expr_phgenes_dev_treatment = expr_phgenes_dev_treatment[order(expr_phgenes_dev_treatment$pvalue.x),]
 
-write.table(expr_phgenes_dev_treatment, "hub_Stress_SAHA.tsv", sep="\t", row.names=FALSE, quote=FALSE)
+
+tmp_GO = select(org.Brassicanapus.eg.db, as.character(putative_hubgenes_involved_treatment$entrezgene_id), c("GO" , "ONTOLOGY", "GENENAME"), "ENTREZID")
+tmp_GO = tmp_GO[tmp_GO$ONTOLOGY=="BP",]
+xx <- as.list(tmp_GO$GO)
+list_terms = c()
+for (i in 1:length(xx)){
+  if (!is.na(xx[[i]])) { 
+    list_terms=c(list_terms,  as.character( Term( xx[[i]] ) )) }
+  else{list_terms =c(list_terms, "")}
+} 
+tmp_GO$GOTERM = list_terms
+tmp_GO= tmp_GO[!is.na(tmp_GO$GO),]
+putative_hubgenes_involved_treatment = merge(tmp_GO, putative_hubgenes_involved_treatment, by.x="ENTREZID", by.y="entrezgene_id", all.y=TRUE)
+expr_phgenes_treatment = merge(putative_hubgenes_involved_treatment, expr_HDAC, by="external_gene_name")
+expr_phgenes_treatment = expr_phgenes_treatment[order(expr_phgenes_treatment$pvalue),]
+expr_phgenes_treatment = merge(expr_phgenes_treatment, Normalized_val, by.x="ENTREZID", by.y="entrezgene_id")
+
+write.table(expr_phgenes_treatment, "/home/famgarcia/Escritorio/hub_Stress_SAHA.tsv", sep="\t", row.names=FALSE, quote=FALSE)
+
+### Hub genes per module
+
+hub_genes_modules = chooseTopHubInEachModule(norm.counts, bwnet$colors, power=12,type = "signed")
+write.table(hub_genes_modules,"/home/famgarcia/Escritorio/hub_genes_per_module.csv", sep=",")
+hub_genes_modules=read.table("/home/famgarcia/Escritorio/hub_genes_per_module.csv", sep=",")
+hub_genes_modules$module = rownames(hub_genes_modules)
+colnames(hub_genes_modules) = "entrezgene_id"
+hub_genes_modules=merge(hub_genes_modules, annot_ncbi, by="entrezgene_id", all.x=TRUE)
+
+
+tmp_GO = select(org.Brassicanapus.eg.db, as.character(hub_genes_modules$entrezgene_id), c("GO" , "ONTOLOGY", "GENENAME"), "ENTREZID")
+tmp_GO = tmp_GO[tmp_GO$ONTOLOGY=="BP",]
+xx <- as.list(tmp_GO$GO)
+list_terms = c()
+for (i in 1:length(xx)){
+  if (!is.na(xx[[i]])) { 
+    list_terms=c(list_terms,  as.character( Term( xx[[i]] ) )) }
+  else{list_terms =c(list_terms, "")}
+} 
+tmp_GO$GOTERM = list_terms
+tmp_GO= tmp_GO[!is.na(tmp_GO$GO),]
+hub_genes_modules = merge(tmp_GO, hub_genes_modules, by.x="ENTREZID", by.y="entrezgene_id", all.y=TRUE)
+hub_genes_modules = merge(hub_genes_modules, Normalized_val, by.x="ENTREZID", by.y="entrezgene_id")
+
+write.table(hub_genes_modules, "/home/famgarcia/Escritorio/Tophub_all_modules.tsv", sep="\t", row.names=FALSE, quote=FALSE)
 
 
 ###############################################################################################
+library(limmaDE2)
+graph<-wgcna2igraph(net = bwnet, datExpr = norm.counts[],
+                    modules2plot = c("black", "greenyellow", "brown", "turquoise", "midnightblue","blue"),
+                    colors2plot = c("gold","lightgreen", "brown","cyan","cornflowerblue", "coral"),
+                    kME.threshold = 0.5, adjacency.threshold = 0.1,
+                    adj.power = pow, verbose = T,
+                    node.size = 0, frame.color = NA, node.color = NA,
+                    edge.alpha = .5, edge.width =1)
+plot(graph)
+
+
+
 ##############################################################################################
 ####################### EXPORT TO CYTOSCAPE
 # The following setting is important, do not omit.
@@ -539,7 +677,7 @@ vis = exportNetworkToVisANT(modTOM[top, top],
 TOM = TOMsimilarityFromExpr(norm.counts, power = 12);
 
 # Select modules
-modules = c("black", "greenyellow", "brown", "turquoise", "midnightblue","blue");
+modules = c("grey60", "lightyellow", "yellow");
 modules = sign_colors
 
 # Select module probes
@@ -561,44 +699,13 @@ cyt = exportNetworkToCytoscape(modTOM,
                                nodeAttr = moduleColors[inModule]);
 
 
+# save hubs from all exp
+data.frame(PE_gs_01 = hub_PEall$entrezgene_id, PE_SAHA_gs_01= hub_PEall$entrezgene_id, VM_gs_01 = )
 
 
 ####################################################################################################
 
 # VISUALIZATION
-#=====================================================================================
-#
-#  VISUALIZE NETWORK OF EIGENGENES - ADJACENCY + TOPOLOGICAL OVERLAP PLOT
-#
-#=====================================================================================
-
-# Calculate topological overlap anew: this could be done more efficiently by saving the TOM
-# calculated during module detection, but let us do it again here.
-dissTOM = 1-TOM
-# Transform dissTOM with a power to make moderately strong connections more visible in the heatmap
-plotTOM = dissTOM^7;
-# Set diagonal to NA for a nicer plot
-diag(plotTOM) = NA;
-# Call the plot function
-sizeGrWindow(9,9)
-TOMplot(plotTOM, bwnet$dendrograms, bwnet$colors, main = "Network heatmap plot, all genes")
-
-
-nSelect = 400
-# For reproducibility, we set the random seed
-set.seed(10);
-select = sample(nGenes, size = nSelect);
-selectTOM = dissTOM[select, select];
-# There's no simple way of restricting a clustering tree to a subset of genes, so we must re-cluster.
-selectTree = hclust(as.dist(selectTOM), method = "average")
-selectColors = moduleColors[select];
-# Open a graphical window
-sizeGrWindow(9,9)
-# Taking the dissimilarity to a power, say 10, makes the plot more informative by effectively changing 
-# the color palette; setting the diagonal to NA also improves the clarity of the plot
-plotDiss = selectTOM^7;
-diag(plotDiss) = NA;
-TOMplot(plotDiss, selectTree, selectColors, main = "Network heatmap plot, selected genes")
 
 
 #=====================================================================================
@@ -668,7 +775,7 @@ allLLIDs = probes
 # Get the corresponding Locuis Link IDs
 #allLLIDs = annot$ALIAS[probes2annot];
 # $ Choose interesting modules
-intModules = c("black", "greenyellow","turquoise")
+intModules = c("brown", "grey60", "lightyellow", "yellow","blue")
 for (module in intModules)
 {
   # Select module probes
@@ -676,17 +783,50 @@ for (module in intModules)
   # Get their entrez ID codes
   modLLIDs = allLLIDs[modGenes];
   # Write them into a file
-  fileName = paste("LocusLinkIDs-", module, ".txt", sep="");
+  fileName = paste("SignNet_genes_modules_interest-", module, ".txt", sep="");
   write.table(as.data.frame(modLLIDs), file = fileName,
               row.names = FALSE, col.names = FALSE)
 }
 # As background in the enrichment analysis, we will use all probes in the analysis.
-fileName = paste("LocusLinkIDs-all.txt", sep="");
+fileName = paste("SignNet_genes_modules_interest-all.txt", sep="");
 write.table(as.data.frame(allLLIDs), file = fileName,
             row.names = FALSE, col.names = FALSE)
 
+#=====================================================================================
+#
+#  GET TOM - WEIGHTED ADJACENCY M FROM INTERESTING MODULES - CONVERT TO EDGE/NODE FILES FOR CYTOSCAPE
+#
+#=====================================================================================
 
-############## WCGNA does not support GOEnrichment for Brassica napus, this will be undertaken with clusterProfiler
+
+# Recalculate topological overlap if needed
+TOM = TOMsimilarityFromExpr(norm.counts, power = 12);
+
+hub_
+unique(c(hub_SAHA$entrezgene_id, hub_VM$entrezgene_id, hub_PEall$entrezgene_id))
+
+
+# Select modules
+modules = c("lightyellow", "grey60");
+modules = sign_colors
+
+# Select module probes
+probes = colnames(norm.counts)
+inModule = is.finite(match(bwnet$colors, modules));
+modProbes = probes[inModule];
+modGenes = annot_ncbi$GENENAME[match(modProbes, annot_ncbi$entrezgene_id)];
+# Select the corresponding Topological Overlap
+modTOM = TOM[inModule, inModule];
+dimnames(modTOM) = list(modProbes, modProbes)
+# Export the network into edge and node list files Cytoscape can read
+cyt = exportNetworkToCytoscape(modTOM,
+                               edgeFile = paste("/home/famgarcia/Escritorio/CytoscapeInput-edges-", paste(modules, collapse="-"), ".txt", sep=""),
+                               nodeFile = paste("/home/famgarcia/Escritorio/CytoscapeInput-nodes-", paste(modules, collapse="-"), ".txt", sep=""),
+                               weighted = TRUE,
+                               threshold = 0.02,
+                               nodeNames = modProbes,
+                               altNodeNames = modGenes,
+                               nodeAttr = moduleColors[inModule]);
 
 
 
