@@ -19,7 +19,7 @@ remotes::install_github("jtlovell/limmaDE2") # requires install.packages("venneu
 #remotes::install_github("kevinblighe/CorLevelPlot")
 #install.packages("WGCNA", dependencies = TRUE)
 
-allowWGCNAThreads()          # allow multi-threading (optional)
+         # allow multi-threading (optional)
 library(WGCNA)
 library(DESeq2)
 library(tidyverse)
@@ -34,7 +34,7 @@ library(igraph)
 library("ggVennDiagram") # requires c pckg - libudunits2-dev, libgdal-dev, units, sf CRAN packages
 library("AnnotationDbi")
 library("AnnotationHub")
-
+allowWGCNAThreads() 
 ######################################################
 # Load bnapus object
 ######################################################
@@ -474,23 +474,107 @@ gene.signf.corr.pvals <- as.data.frame(gene.signf.corr.pvals)
 colnames(gene.signf.corr.pvals)=c("pvalue")
 significant_genes_stagedev_VM = subset(gene.signf.corr.pvals, pvalue<=0.01)
 
-
+modNames = rownames(module.membership.measure)
+module = "brown"
+  column = match(paste("ME",module,sep=""), modNames);
+  associated_mod_genes <- module.gene.mapping %>% 
+    filter(`bwnet$colors` == module) %>% 
+    rownames()
+  
+png("/home/famgarcia/mme_traitVM_brown.png", width=15, height=10, units="cm", res=250)
 verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
                    abs(gene.signf.corr[moduleGenes, 1]),
                    xlab = paste("Module Membership in", module, "module"),
-                   ylab = "Gene significance for body weight",
+                   ylab = "Gene significance for Vacuolated Microspore",
                    main = paste("Module membership vs. gene significance\n"),
                    cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+dev.off()
+
+modNames = rownames(module.membership.measure)
+module = "turquoise"
+  column = match(paste("ME",module,sep=""), modNames);
+  associated_mod_genes <- module.gene.mapping %>% 
+    filter(`bwnet$colors` == module) %>% 
+    rownames()
+  
+png("/home/famgarcia/mme_traitVM_turquoise.png", width=15, height=10, units="cm", res=250)
+verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
+                     abs(gene.signf.corr[moduleGenes, 1]),
+                     xlab = paste("Module Membership in", module, "module"),
+                     ylab = "Gene significance for Vacuolated Microspore",
+                     main = paste("Module membership vs. gene significance\n"),
+                     cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+dev.off()
+
+modNames = rownames(module.membership.measure)
+module = "yellow"
+  column = match(paste("ME",module,sep=""), modNames);
+  associated_mod_genes <- module.gene.mapping %>% 
+    filter(`bwnet$colors` == module) %>% 
+    rownames()
 
 
+png("/home/famgarcia/mme_traitVM_yellow.png", width=15, height=10, units="cm", res=250)
+verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
+                   abs(gene.signf.corr[moduleGenes, 1]),
+                   xlab = paste("Module Membership in", module, "module"),
+                   ylab = "Gene significance for Vacuolated Microspore",
+                   main = paste("Module membership vs. gene significance\n"),
+                   cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+dev.off()
 
+modNames = rownames(module.membership.measure)
+module = "blue"
+  column = match(paste("ME",module,sep=""), modNames);
+  associated_mod_genes <- module.gene.mapping %>% 
+    filter(`bwnet$colors` == module) %>% 
+    rownames()
+  
 
-write.table(rownames(significant_genes_stagedev_VM), "hub_VM.tsv", sep="\t", row.names=FALSE, quote=FALSE, col.names = FALSE)
-write.table(rownames(significant_genes_stagedev_PE), "hub_PEC.tsv", sep="\t", row.names=FALSE, quote=FALSE, col.names = FALSE)
-write.table(rownames(significant_genes_treatment), "hub_SAHA.txt", sep="\t", row.names=FALSE, quote=FALSE, col.names = FALSE)
+  png("/home/famgarcia/mme_traitVM_blue.png", width=15, height=10, units="cm", res=250)
+  verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
+                     abs(gene.signf.corr[moduleGenes, 1]),
+                     xlab = paste("Module Membership in", module, "module"),
+                     ylab = "Gene significance for Vacuolated Microspore",
+                     main = paste("Module membership vs. gene significance\n"),
+                     cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+  dev.off()
 
-
-
+  
+  modNames = rownames(module.membership.measure)
+  module = "lightyellow"
+    column = match(paste("ME",module,sep=""), modNames);
+    associated_mod_genes <- module.gene.mapping %>% 
+      filter(`bwnet$colors` == module) %>% 
+      rownames()
+    
+    verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
+                       abs(gene.signf.corr[moduleGenes, 1]),
+                       xlab = paste("Module Membership in", module, "module"),
+                       ylab = "Gene significance for Vacuolated Microspore",
+                       main = paste("Module membership vs. gene significance\n"),
+                       cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+  
+    
+    modNames = rownames(module.membership.measure)
+    module = "grey60"
+      column = match(paste("ME",module,sep=""), modNames);
+      associated_mod_genes <- module.gene.mapping %>% 
+        filter(`bwnet$colors` == module) %>% 
+        rownames()
+      
+      verboseScatterplot(abs(module.membership.measure[column, moduleGenes]),
+                         abs(gene.signf.corr[moduleGenes, 1]),
+                         xlab = paste("Module Membership in", module, "module"),
+                         ylab = "Gene significance for Vacuolated Microspore",
+                         main = paste("Module membership vs. gene significance\n"),
+                         cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+      
+  
+  write.table(rownames(significant_genes_stagedev_VM), "hub_VM.tsv", sep="\t", row.names=FALSE, quote=FALSE, col.names = FALSE)
+  write.table(rownames(significant_genes_stagedev_PE), "hub_PEC.tsv", sep="\t", row.names=FALSE, quote=FALSE, col.names = FALSE)
+  write.table(rownames(significant_genes_treatment), "hub_SAHA.txt", sep="\t", row.names=FALSE, quote=FALSE, col.names = FALSE)
+  
 # Annotate results
 
 
@@ -677,14 +761,15 @@ vis = exportNetworkToVisANT(modTOM[top, top],
 TOM = TOMsimilarityFromExpr(norm.counts, power = 12);
 
 # Select modules
-modules = c("grey60", "lightyellow", "yellow");
+#modules = c("grey60", "lightyellow", "yellow", "blue");
+modules = c("grey60", "lightyellow", "yellow", "blue");
 modules = sign_colors
 
 # Select module probes
 probes = colnames(norm.counts)
 inModule = is.finite(match(bwnet$colors, modules));
 modProbes = probes[inModule];
-modGenes = annot_ncbi$ALIAS[match(modProbes, annot_ncbi$entrezgene_id)];
+modGenes = annot_ncbi$GENENAME[match(modProbes, annot_ncbi$entrezgene_id)];
 # Select the corresponding Topological Overlap
 modTOM = TOM[inModule, inModule];
 dimnames(modTOM) = list(modProbes, modProbes)
@@ -700,7 +785,32 @@ cyt = exportNetworkToCytoscape(modTOM,
 
 
 # save hubs from all exp
-data.frame(PE_gs_01 = hub_PEall$entrezgene_id, PE_SAHA_gs_01= hub_PEall$entrezgene_id, VM_gs_01 = )
+modules=c("PE_gs_01","PE_SAHA_gs_01","VM_gs_01")
+modColors = as.data.frame(rbind( cbind(hub_PEall$entrezgene_id, rep("PE_gs_01",length(hub_PEall$entrezgene_id))),
+cbind(hub_SAHA$entrezgene_id, rep("PE_SAHA_gs_01",length(hub_SAHA$entrezgene_id))),
+cbind(hub_VM$entrezgene_id, rep("VM_gs_01",length(hub_VM$entrezgene_id))) ))
+colnames(modColors)<-c("gid","annot")
+rownames(modColors)<-modColors$gid
+modColors$gid<-NULL
+
+modProbes = unique(modColors$gid)
+
+modGenes = annot_ncbi$ALIAS[match(modProbes, annot_ncbi$entrezgene_id)];
+inModules =  colnames(norm.counts) %in% modProbes
+# Select the corresponding Topological Overlap
+modTOM = TOM[inModules, inModules];
+dimnames(modTOM) = list(modProbes, modProbes)
+
+
+# Export the network into edge and node list files Cytoscape can read
+cyt = exportNetworkToCytoscape(modTOM,
+                               edgeFile = paste("/home/famgarcia/Escritorio/CytoscapeInput-edges_gs_traits-", paste(modules, collapse="-"), ".txt", sep=""),
+                               nodeFile = paste("/home/famgarcia/Escritorio/CytoscapeInput-nodes_gs_traits-", paste(modules, collapse="-"), ".txt", sep=""),
+                               weighted = TRUE,
+                               threshold = 0.02,
+                               nodeNames = modProbes,
+                               altNodeNames = modGenes,
+                               nodeAttr = modColors[!duplicated(modColors$gid),]);
 
 
 ####################################################################################################
@@ -775,7 +885,9 @@ allLLIDs = probes
 # Get the corresponding Locuis Link IDs
 #allLLIDs = annot$ALIAS[probes2annot];
 # $ Choose interesting modules
-intModules = c("brown", "grey60", "lightyellow", "yellow","blue")
+
+intModules = c("grey60", "lightyellow", "yellow", "blue","brown", "turquoise");
+
 for (module in intModules)
 {
   # Select module probes
