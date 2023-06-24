@@ -124,7 +124,6 @@ common_HDACnoME = merge(common_HDACnoME_GO, common_HDACnoME, by.x="ENTREZID", by
 
 
 
-
 ##############################################################################################################
 
 # Biological question 2: What is the differernce in embryogenesis taking and not taking into account SAHA treatment?
@@ -201,7 +200,10 @@ write.table(not_common_HDAC, "/home/famgarcia/Descargas/outersec_DEG_ME_HDAC.csv
 ################### GET DEGs COMMON AMONG TWO CONDITIONS, BUT SEGMENTED BY different TYPE OF EXPRESSION
 
 ############################################## Write annotated gene intersections in tables
-##### ME_HDACi DOWN, ME_UP
+##### ME_HDACi UP, ME_DOWN
+
+write.csv(as.data.frame(intersect(x[[1]],x[[3]])), "/home/famgarcia/Escritorio/DEG_subset_interest_HDACi_ME.csv", row.names = F, quote = F)
+write.csv(as.data.frame(intersect(x[[2]],x[[4]])), "/home/famgarcia/Escritorio/DEG_subset_interest_DOWN_HDACi_ME.csv", row.names = F, quote = F)
 
 not_common_dExdownME = expr_HDAC_Stress[expr_HDAC_Stress$external_gene_name %in% intersect(x[[1]],x[[3]]),] 
 not_common_dExdownME = merge(annot_ncbi[!duplicated(annot_ncbi$entrezgene_id),], not_common_dExdownME, by="external_gene_name")
@@ -222,7 +224,7 @@ not_common_dExdownME_GO = merge(not_common_dExdownME_GO, not_common_dExdownME, b
 write.table(not_common_dExdownME_GO, "/home/famgarcia/Descargas/intersec_DEG_ME_HDAC_UP_ME_DOWN.csv", row.names=F)
 
 
-##### ME_HDACi UP, ME_DOWN
+##### ME_HDACi DOWN, ME UP
 
 not_common_dExupME = expr_HDAC_Stress[expr_HDAC_Stress$external_gene_name %in% intersect(x[[2]],x[[4]]),] 
 not_common_dExupME = merge(annot_ncbi[!duplicated(annot_ncbi$entrezgene_id),], not_common_dExupME, by="external_gene_name")
