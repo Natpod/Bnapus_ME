@@ -7,6 +7,17 @@
 
 data_to_norm <- read.csv("/home/famgarcia/Escritorio/genes_all_experiments_batch_correction.csv", sep=",")
 
+
+# create dds to perform a Variance Stabilizing Transformation Normalization from the counts
+dds_tonorm <- DESeqDataSetFromMatrix(countData = data_to_norm,
+                                     colData = colData,
+                                     design = ~ 1) # not spcifying model
+dds_tonorm<-vst(dds_tonorm)
+write.table(assay(dds_tonorm),"/home/famgarcia/Escritorio/VST_norm_countscsv")
+
+
+# filter by gene id
+data_to_norm <- assay(dds_tonorm)
 data_to_norm$ensembl_id = rownames(data_to_norm)
 
 # 2. Filter by having Entrez ID
@@ -21,13 +32,8 @@ data_to_norm = merge(data_to_norm, filter, by = "ensembl_id")
 
 # prepare data
 data_to_norm = data_to_norm[!duplicated(data_to_norm$gid),]
-data_eid$ensembl_id = NULL
+data_to_norm$ensembl_id = NULL
 rownames(data_to_norm) = data_to_norm$gid
 data_to_norm$gid = NULL
 
-# create dds to perform a Variance Stabilizing Transformation Normalization from the counts
-dds_tonorm <- DESeqDataSetFromMatrix(countData = data.subset,
-                                     colData = colData,
-                                     design = ~ 1) # not spcifying model
-dds_tonorm<-vst(dds_tonorm)
-write.table(assay(dds_tonorm),"/home/famgarcia/Escritorio/VST_norm_counts.csv")
+write.table(data_to_norm,"/home/famgarcia/Escritorio/VST_norm_countscsv")
