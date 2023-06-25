@@ -20,7 +20,6 @@ library("gplots")
 library("amap")
 library("ggplot2")
 library("BiocParallel")
-library("DEG")
 
 suppressWarnings(suppressMessages({
   library('easypackages',warn.conflicts = FALSE, quietly=TRUE)
@@ -931,7 +930,7 @@ dds<-DESeqDataSetFromMatrix(
     countData=as.matrix(data),
     design =~ condition,
     colData=data.frame(
-      condition = c("T","T","T","VM","VM","VM")))
+      condition = c("VM","VM","VM","T","T","T")))
 
 #specifying the reference level:
 
@@ -1064,11 +1063,11 @@ dds<-DESeqDataSetFromMatrix(
     countData=as.matrix(data),
     design =~ condition,
     colData=data.frame(
-      condition = c("T","T","T","VM","VM","VM")))
+      condition = c("VM","VM","VM","T","T","T")))
 
 #specifying the reference level:
 
-dds$condition <- factor(dds$condition, levels = c("T","VM"))
+dds$condition <- factor(dds$condition, levels = c("VM","T"))
 dds$condition <- relevel(dds$condition, ref = "VM")
 
 ```
@@ -1087,7 +1086,9 @@ logsumcounts <- log(sumcounts,base=10)
 sprintf("Genes before filtering : %s",length(logsumcounts))
 
 # plot a histogram of the log scaled counts
+png("/home/famgarcia/Escritorio/Histlog10_VM_vs_T_beforefilter", width=12, height=12, units="cm", res=300)
 plot_without_filter <- hist(logsumcounts,breaks=100, main="Histogram of the log scaled counts")
+dev.off()
 
 # get genes with summed counts greater than 10; remove lowly expressed genes
 keep <- sumcounts > 10
@@ -1100,8 +1101,11 @@ sumcounts <- rowSums(counts(dds_filter))
 logsumcounts <- log(sumcounts,base=10)
 # plot a histogram of the log scaled counts
 
-
+png("/home/famgarcia/Escritorio/Histlog10_VM_vs_T_afterfilter", width=12, height=12, units="cm", res=300)
 plot_with_filter <- hist(logsumcounts,breaks=100,main="Histogram of the log scaled counts \n keep only the genes with summed counts greater than 10" )
+dev.off()
+
+
 ```
 ```{r}
 
@@ -1112,25 +1116,19 @@ dds <- DESeq(dds_filter, fitType="local")
 counts <- counts(dds, normalized = TRUE)
 design <- as.data.frame(colData(dds))
 
-degCheckFactors(counts[, 1:6])
-
 
 ```
-```{r}
-res <- results(dds, pAdjustMethod="BH") 
-degQC(counts, design[["condition"]], pvalue = res[["padj"]])
-```
 
-```{r}
-boxplot(vst(counts(dds)))
-```
+
 
 ## Run DESeq2 DEG analysis
 
 
 ```{r}
-plotDispEsts(dds, main="Dispersion plot")
 
+png("/home/famgarcia/Escritorio/dispersionPlot_VM_vs_T.png", width=12, height=12, units="cm", res=300)
+plotDispEsts(dds, main="Dispersion plot")
+dev.off()
 ```
 ```{r}
 par(mar=c(8,5,2,2))
@@ -1173,27 +1171,27 @@ sprintf('genes with padj<0.05 and LFC<-1 (down) : %s', nrow(ressign[which((!ress
 ```{r}
 
 ##Create normalized read counts
-normalized_counts_Stress <- counts(dds_Stress, normalized=TRUE)
+normalized_counts <- counts(dds, normalized=TRUE)
 
-normalized_counts_mad_Stress <- apply(normalized_counts_Stress, 1, mad)
-normalized_counts_Stress <- normalized_counts_Stress[order(normalized_counts_mad_Stress, decreasing=T), ]
+normalized_counts_mad <- apply(normalized_counts, 1, mad)
+normalized_counts <- normalized_counts[order(normalized_counts_mad, decreasing=T), ]
 
 
 write.table(normalized_counts_Stress,"/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Condition_PEall_vs_VM_normcounts_badj_DevStage_MoR.csv",quote=FALSE, sep=",")
 
-rlog_normalized_counts_Stress <- rlog(counts(dds_Stress))
+#rlog_normalized_counts_Stress <- rlog(counts(dds_Stress))
 
-write.table(rlog_normalized_counts_Stress,"/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Condition_PEall_vs_VM_normcounts_badj_DevStage_RlogTr.csv",quote=FALSE, sep=",")
+#write.table(rlog_normalized_counts_Stress,"/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Condition_PEall_vs_VM_normcounts_badj_DevStage_RlogTr.csv",quote=FALSE, sep=",")
 
 
 #DESeq get results table - TOTAL RESULTS
 
 
-Res_A_X_total_Stress <- results(dds_Stress,
+Res_A_X_total <- results(dds,
 name="condition_T_vs_VM",
 pAdjustMethod="BH")
 
-Res_A_X_total_Stress <- Res_A_X_total_Stress[order(Res_A_X_total_Stress$padj),]
+Res_A_X_total <- Res_A_X_total[order(Res_A_X_total_Stress$padj),]
 
 
 
@@ -1210,7 +1208,7 @@ ann <- group_by(ann, ensembl_gene_id) %>%
   summarize(.,description=unique(description),transcript_length=max(transcript_length))
 
 # Reannotate transcripts
-go_ann <- getBM(filter="ensembl_gene_id",value=rownames(Res_A_X_total),attributes=c("ensembl_gene_id","chromosome_name", "external_gene_name","start_position", "end_position", "strand", "transcript_biotype","transcript_length", "description"),bnapus_mart, useCache = FALSE)
+go_ann <- getBM(filter="ensembl_gene_id",value=rownames(Res_A_X_total),attributes=c("ensembl_gene_id", "external_gene_name","start_position", "end_position", "strand", "description"),bnapus_mart, useCache = FALSE)
 
 
 nrow(Res_A_X_total)
@@ -1235,11 +1233,17 @@ Res_A_X_total_0.05 <-subset(Res_A_X_total, padj <=0.05)
 
 #dir.create(paste(directory,"/DE_results/",sep=""))
 
-write.table(normalized_counts,"/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Condition_T_vs_VM_normcounts_badj_DevStage_MoR.csv",quote=FALSE, sep=",")
-write.table(vst_normalized_counts,"/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Condition_T_vs_VM_normcounts_badj_DevStage_vst.csv",quote=FALSE, sep=",")
+write.table(normalized_counts,"/home/famgarcia/VM_vs_HDAC_DEA/Condition_T_vs_VM_normcounts_badj_DevStage_MoR.csv",quote=FALSE, sep=",")
+rlog_normalized_counts = rlog(dds, blind=FALSE)
+write.table(rlog_normalized_counts,"/home/famgarcia/VM_vs_HDAC_DEA/Condition_T_vs_VM_normcounts_badj_DevStage_rlog.csv",quote=FALSE, sep=",")
 
-write.csv(Res_A_X_total, "/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Condition_T_vs_C_results_total_bce_DevStage.csv", )
-write.csv(Res_A_X_total_0.05, "/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Condition_T_vs_C_result_padj_0.05_DevStage.csv") 
+# normalized, variance-stabilized transformed counts for visualization
+vst_normalized_counts <- vst(dds, blind=FALSE)
+vst_normalized_counts <- assay(vst_normalized_counts)
+write.table(vst_normalized_counts,"/home/famgarcia/VM_vs_HDAC_DEA/Condition_T_vs_VM_normcounts_badj_DevStage_vst.csv",quote=FALSE, sep=",")
+
+write.csv(Res_A_X_total, "/home/famgarcia/VM_vs_HDAC_DEA/Condition_T_vs_VM_results_total_bce_DevStage.csv", )
+write.csv(Res_A_X_total_0.05, "/home/famgarcia/VM_vs_HDAC_DEA/Condition_T_vs_VM_result_padj_0.05_DevStage.csv") 
 
 #Note on p-values set to NA: some values in the results table can be set to NA for one of the following reasons:
 
@@ -1247,6 +1251,22 @@ write.csv(Res_A_X_total_0.05, "/home/famgarcia/TFM/data/Testillano col/MV vs PE_
 #If a row contains a sample with an extreme count outlier then the p value and adjusted p value will be set to NA. These outlier counts are detected by Cook’s distance. Customization of this outlier filtering and description of functionality for replacement of outlier counts and refitting is described below
 #If a row is filtered by automatic independent filtering, for having a low mean normalized count, then only the adjusted p value will be set to NA. Description and customization of independent filtering is described below
 ```
+
+
+```{r}
+# Save file with sorted ranking score - Wald statistic for ranking
+rank_res <- Res_A_X_total_plot[,c(9,5)]
+write.table(rank_res[order(rank_res$stat,decreasing=TRUE),],"/home/famgarcia/VM_vs_HDAC_DEA/Rank_T_vs_VM_bce_DevStage.rnk", row.names = FALSE, sep=",", quote=FALSE, col.names=FALSE)
+```
+
+```{r}
+rownames(Res_A_X_total_plot)  <- Res_A_X_total_plot$external_gene_name
+```
+
+```{r}
+head(Res_A_X_total_plot)
+```
+
 ```{r}
 genelist <- rownames(resLFC)
 lfc_df = as.data.frame(resLFC[,2])
@@ -1263,21 +1283,6 @@ final_df_filtered <- subset(subset(final_df, padj<0.05),abs(log2FoldChange)>1)
 
 write.table(final_df_filtered,"/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Final_Condition_T_vs_VM_LFC1_padj05_badj.csv", quote=FALSE, sep=",", row.names = FALSE)
 ```
-
-```{r}
-# Save file with sorted ranking score - Wald statistic for ranking
-rank_res <- Res_A_X_total_plot[,c(9,5)]
-write.table(rank_res[order(rank_res$stat,decreasing=TRUE),],"/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Rank_T_vs_VM_bce_DevStage.rnk", row.names = FALSE, sep=",", quote=FALSE, col.names=FALSE)
-```
-
-```{r}
-rownames(Res_A_X_total_plot)  <- Res_A_X_total_plot$external_gene_name
-```
-
-```{r}
-head(Res_A_X_total_plot)
-```
-
 ## RNA-seq data quality assessment
 
 ### Sample Clustering {.tabset .tabset-fade .tabset-pills}
@@ -1289,9 +1294,9 @@ transcripts based on DeSeq2 (Love et al. 2014).
 ```{r echo=, message=FALSE, warning=FALSE}
 # log transformed expression
 
-#rld <- rlog(dds, blind=FALSE)
-#rlogMat <- assay(rld)
-#rlogMat <- rlogMat[order(normalized_counts_mad, decreasing=T), ]
+rld <- rlog(dds, blind=FALSE)
+rlogMat <- assay(rld)
+rlogMat <- rlogMat[order(normalized_counts_mad, decreasing=T), ]
 
 # Generar color
 hmcol <- colorRampPalette(brewer.pal(9, "GnBu"))(100)
@@ -1302,29 +1307,27 @@ pearson_cor <- as.matrix(cor(rlogMat, method="pearson"))
 # Hierarchical clustering
 hc <- hcluster(t(rlogMat), method="pearson")
 
-#svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/Treecorr_ME_HDAC.svg")
+svg("/home/famgarcia/VM_vs_HDAC_DEA/Treecorr_ME_HDAC_rlog.svg")
 TreeC = as.dendrogram(hc, method="average")
 plot(TreeC,
      main = "Sample Clustering-checking outliers ",
      ylab = "Height")
-#dev.off()
+dev.off()
 
 #adjust plot margins
 #par(mar=c(7,4,9,2)+0.1) 
 
-#svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/HeatmapRLDcorr_ME_HDAC.svg")
+svg("/home/famgarcia/VM_vs_HDAC_DEA/HeatmapRLDcorr_ME_HDAC.svg")
 heatmap.2(pearson_cor, Rowv=as.dendrogram(hc), symm=T,trace="none",
 col=hmcol, main="Pearson correlation of each
 sample")
-#dev.off()
+dev.off()
 ```
 ```{r}
-write.csv(pearson_cor, "/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/pearsonRLD_ME_HDAC_bc_DevStage.csv")
+write.csv(pearson_cor, "/home/famgarcia/VM_vs_HDAC_DEA/pearsonRLD_ME_HDAC_bc_DevStage.csv")
 ```
 
-```{r}
 
-```
 
 
 ```{r echo=, message=FALSE, warning=FALSE}
@@ -1332,13 +1335,13 @@ write.csv(pearson_cor, "/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/pe
 # normalized, variance-stabilized transformed counts for visualization
 vsd <- vst(dds, blind=FALSE)
 
-#svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/VST_PCA_ME_HDAC.svg")
+svg("/home/famgarcia/VM_vs_HDAC_DEA/VST_PCA_ME_HDAC.svg")
 plotPCA(vsd, intgroup="condition") + geom_text(aes(label=name),vjust=-1) +  ggtitle("PCA Plot using variance stabilizing transformation data") + scale_x_continuous(limits = c(-100, 100))  +  scale_y_continuous(limits = c(-50, 50)) # change limits to fix figure dimensions
-#dev.off()
+dev.off()
 
-#svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/RLD_PCA_ME_HDAC.svg")
+svg("/home/famgarcia/VM_vs_HDAC_DEA/RLD_PCA_ME_HDAC.svg")
 plotPCA(rld, intgroup="condition") + geom_text(aes(label=name),vjust=1.5) + ggtitle("PCA Plot using Regularized log  Transformation data") + scale_x_continuous(limits = c(-200, 200))  +  scale_y_continuous(limits = c(-100, 100)) # change limits to fix figure dimensions
-#dev.off()
+dev.off()
 
 pca_data <- plotPCA(rld, intgroup="condition", returnData=T)
 ```
@@ -1373,16 +1376,16 @@ plotSparsity(dds_new)
 ```
 
 ```{r, warning = FALSE, message = FALSE, echo = FALSE, fig.width=5, fig.height=5}
-#svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/PMA_Standard_PE_HDAC.svg")
+png("/home/famgarcia/VM_vs_HDAC_DEA/PMA_Standard_PE_HDAC.png", width=12, height=12, units="cm", res=300)
 plotMA(dds , alpha =0.05, main=("Standard Bland-Altman- MA Plot"))
-#dev.off()
+dev.off()
 
 resLFC <- lfcShrink(dds, coef="condition_T_vs_VM", type="apeglm")
 
-#svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/PMA_ShrunkenME_HDAC.svg")
+png("/home/famgarcia/VM_vs_HDAC_DEA/PMA_ShrunkenME_HDAC.png", width=12, height=12, units="cm", res=300)
 #You can see that genes with low counts are now shrinked.                  
 plotMA(resLFC, alpha =0.05, ylim=c(-4,4) ,main= ("MA plot shrunken log2 fold changes"))
-#dev.off()
+dev.off()
 
 maplot = ggmaplot(resLFC, size = 1,
                   palette = c("#e55c30", "#84206b", "#f6d746"),
@@ -1390,9 +1393,9 @@ maplot = ggmaplot(resLFC, size = 1,
                   legend="top", top = 15,font.label = c("bold", 6),
                   font.legend = c("bold",12), font.main = "bold",
                   xlab = "Log2 Mean Expression",  ylab="Log2 FC")
-#svg("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/MAPLOT_ME_HDAC_better.svg")
+png("/home/famgarcia/VM_vs_HDAC_DEA/MAPLOT_ME_HDAC_better.png", width=12, height=12, units="cm", res=300)
 show(maplot)
-#dev.off()
+dev.off()
 ```
 
 ### Volcano plot {.tabset .tabset-fade .tabset-pills}
@@ -1442,24 +1445,60 @@ data <- mutate(data, color = case_when(data$lfc > 1 & data$pval > 1.3 ~ "Increas
                                        abs(data$lfc) > 1 | data$pval < 1.3 ~ "nonsignificant"))
 
 #png("/home/famgarcia/TFM/data/Testillano col/MV vs PE_HDAC/VolcanoFiltering_ME_HDAC.png", res=300, height=20,width=20, units="cm")
+
+data_up_g = data[(data$color == "Increased" ) ,]
+data_up_g = data_up_g[data_up_g$pval >1.3,]
+data_up_g = data_up_g[order(data_up_g$pval, decreasing = TRUE),]
+data_up_g = data_up_g[1:10,]
+data_up_g = data_up_g[order(data_up_g$lfc, decreasing = TRUE),]
+data_up_g = data_up_g[1:5,]
+
+data_down_g = data[(data$color == "Decreased" ) ,]
+data_down_g = data_down_g[data_down_g$pval > 1.3,]
+data_down_g = data_down_g[order(data_down_g$pval, decreasing = TRUE),]
+data_down_g = data_down_g[1:10,]
+data_down_g = data_down_g[order(data_down_g$lfc, decreasing = F),]
+data_down_g = data_down_g[1:5,]
+
 # Make a basic ggplot2 object with x-y values
 vol <- ggplot(data, aes(x = lfc, y = pval, color = color))
 
-# Add ggplot2 layers
-vol +   
-  ggtitle(label = "Volcano Plot", subtitle = "Colored by fold-change direction") +
-  geom_point(size = 2.5, alpha = 0.8, na.rm = T) +
-  scale_color_manual(name = "Directionality",
-                     values = c(Increased = "#008B00", Decreased = "#CD4F39", nonsignificant = "darkgray")) +
-  theme_bw(base_size = 14) + # change overall theme
-  theme(legend.position = "right") + # change the legend
-  xlab(expression(log[2]("Log2FoldChange"))) + # Change X-Axis label
-  ylab(expression(-log[10]("adjusted p-value"))) + # Change Y-Axis label
-  #geom_hline(xintercept = 1.3, colour = "darkgrey") + # Add p-adj value cutoff line
-  #geom_hline(yintercept = 1, colour = "darkgrey") + # Add p-adj value cutoff line
-  scale_y_continuous(trans = "log1p", oob = scales::squish_infinite, limits = c(0,400))# Scale yaxis due to large p-values
 
-#dev.off()
+
+# Add ggplot2 layers
+vol <- vol +   
+  ggtitle(label = "Volcano Plot", subtitle = "Colored by fold-change direction") +
+  geom_point(size = 0.4, alpha = 0.8, na.rm = T) +
+  scale_color_manual(name = "Directionality",
+                     values = c(Increased = "#CD4F39", Decreased = "#008B00", nonsignificant = "darkgray")) +
+  scale_fill_discrete(labels=c('Increased : 17254 genes', 'Decreased : 15914 genes', 'nonsignificant : 35946 genes')) +
+  theme_bw(base_size = 10) + # change overall theme
+  theme(legend.position = "right") + # change the legend
+  xlab(expression(log[2]("FoldChange"))) + # Change X-Axis label
+  ylab(expression(-log[10]("adjusted p-value"))) + # Change Y-Axis label
+  geom_hline(yintercept = -1.3, colour = "darkgrey", linetype = 2) + # Add p-adj value cutoff line
+  geom_hline(yintercept = 1.3, colour = "darkgrey", linetype = 2) +
+  geom_vline(xintercept = 1, colour = "darkgrey", linetype = 2) + # Add LFC value cutoff line
+  geom_vline(xintercept = -1, colour = "darkgrey", linetype = 2) +
+  scale_y_continuous(trans = "log1p", oob = scales::squish_infinite, limits = c(0,400)) # Scale yaxis due to large p-values
+
+png("/home/famgarcia/VM_vs_HDAC_DEA/volcanoplot_VM_vs_T.png", width=15, height=9, units="cm", res=300)
+vol + geom_label_repel(
+    data = data_up_g,
+    aes(label = gene, x =lfc, y=pval),
+    size = 1.2,
+    fill = "lightcoral",
+    color="black") +
+  geom_label_repel(
+    data = data_down_g,
+    aes(label = gene, x =lfc, y=pval),
+    size = 1.2,
+    fill = "lightgreen",
+    color="black"
+  ) 
+dev.off()
+
+
 ```
 
 ### Pheatmap {.tabset .tabset-fade .tabset-pills}
