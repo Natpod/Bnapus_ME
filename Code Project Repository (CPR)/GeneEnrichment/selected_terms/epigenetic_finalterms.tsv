@@ -1,0 +1,56 @@
+ID	term	context	Count
+GO:0006334	nucleosome assembly	nucleosome	129
+GO:0006335	DNA replication-dependent chromatin assembly	chromatin organization	7
+GO:0006338	chromatin remodeling	ATP dependent chromatin remodelling	401
+GO:0006346	DNA methylation-dependent heterochromatin formation	DNA methylation and chromatin organization	56
+GO:0010452	histone H3-K36 methylation	histone methylation	2
+GO:0010964	regulation of regulatory ncRNA-mediated heterochromatin formation	chromatin organization driven by RNA	1
+GO:0016570	histone modifications	histone modification	434
+GO:0016571	histone methylation	histone modification	102
+GO:0016573	histone acetylation	histone modification	115
+GO:0016574	histone ubiquitination	histone modification	25
+GO:0016575	histone deacetylation	histone modification	78
+GO:0016577	histone demethylation	histone methylation	27
+GO:0016578	histone deubiquitination	histone modification	7
+GO:0031048	regulatory ncRNA-mediated heterochromatin formation	chromatin organization driven by RNA	66
+GO:0031055	chromatin remodeling at centromere	ATP dependent chromatin remodelling	2
+GO:0031056	regulation of histone modification	histone modification	25
+GO:0031060	regulation of histone methylation	histone methylation	3
+GO:0031445	regulation of heterochromatin formation	chromatin organization	1
+GO:0031507	heterochromatin formation	chromatin organization	90
+GO:0031509	subtelomeric heterochromatin formation	chromatin organization	4
+GO:0032776	DNAme	DNA methylation	15
+GO:0032776	DNA methylation on cytosine	DNA methylation	15
+GO:0033169	histone H3-K9 demethylation	histone methylation	24
+GO:0034728	nucleosome organization	nucleosome	154
+GO:0034968	histone lysine methylation	histone methylation	70
+GO:0034969	histone arginine methylation	histone methylation	6
+GO:0035065	regulation of histone acetylation	histone acetylation	11
+GO:0035066	positive regulation of histone acetylation	histone acetylation	10
+GO:0035067	negative regulation of histone acetylation	histone acetylation	4
+GO:0040029	ep regulation of gene expression	general epigenetic	119
+GO:0043966	histone H3 acetylation	histone acetylation	12
+GO:0043967	histone H4 acetylation	histone acetylation	19
+GO:0043968	histone H2A acetylation	histone acetylation	6
+GO:0043970	histone H3-K9 acetylation	histone acetylation	1
+GO:0043981	histone H4-K5 acetylation	histone acetylation	4
+GO:0043982	histone H4-K8 acetylation	histone acetylation	4
+GO:0043984	histone H4-K16 acetylation	histone acetylation	5
+GO:0043985	histone H4-R3 methylation	histone methylation	3
+GO:0044154	histone H3-K14 acetylation	histone acetylation	1
+GO:0051567	histone H3-K9 methylation	histone methylation	2
+GO:0051568	histone H3-K4 methylation	histone methylation	18
+GO:0051569	regulation of histone H3-K4 methylation	histone methylation	1
+GO:0051570	regulation of histone H3-K9 methylation	histone methylation	2
+GO:0061647	histone H3-K9 modification	histone modification	3
+GO:0070076	histone lysine demethylation	histone methylation	27
+GO:0070544	histone H3-K36 demethylation	histone methylation	3
+GO:0070734	histone H3-K27 methylation	histone methylation	7
+GO:0080182	histone H3-K4 trimethylation	histone methylation	3
+GO:0080188	gene silencing by RNA-directed DNA methylation	chromatin organization driven by RNA and DNA methylation	56
+GO:0080188	RdDM	DNA methylation driven by RNA	56
+GO:0090116	C-5 methylation of cytosine	DNA methylation	14
+GO:0098532	histone H3-K27 trimethylation	histone methylation	7
+GO:0140718	facultative heterochromatin formation	chromatin organization	56
+GO:0140719	constitutive heterochromatin formation	chromatin organization	4
+GO:1990258	histone glutamine methylation	histone methylation	5

@@ -1,0 +1,69 @@
+ID	term	context	Count
+GO:0009685	gibberellin metabolic process	gibberelin related	42
+GO:0009686	gibberellin biosynthetic process	gibberelin related	26
+GO:0009687	abscisic acid metabolic process	abscisic acid related	22
+GO:0009688	abscisic acid biosynthetic process	abscisic acid related	14
+GO:0009690	cytokinin metabolic process	cytokinin related	89
+GO:0009691	cytokinin biosynthetic process	cytokinin related	66
+GO:0009695	jasmonic acid biosynthetic process	JA related	19
+GO:0009696	salicylic acid metabolic process	SA related	58
+GO:0009697	salicylic acid biosynthetic process	SA related	16
+GO:0009723	response to ethylene	ethylene related	168
+GO:0009733	response to auxin	auxin related	707
+GO:0009734	auxin-activated signaling pathway	auxin related	394
+GO:0009735	response to cytokinin	cytokinin related	158
+GO:0009736	cytokinin-activated signaling pathway	cytokinin related	154
+GO:0009737	response to abscisic acid	abscisic acid related	185
+GO:0009738	abscisic acid-activated signaling pathway	abscisic acid related	87
+GO:0009739	response to gibberellin	gibberelin related	120
+GO:0009741	response to brassinosteroid	brassinosteroid related	104
+GO:0009742	brassinosteroid mediated signaling pathway	brassinosteroid related	102
+GO:0009751	response to salicylic acid	SA related	93
+GO:0009753	response to jasmonic acid	JA related	113
+GO:0009787	regulation of abscisic acid-activated signaling pathway	abscisic acid related	16
+GO:0009788	negative regulation of abscisic acid-activated signaling pathway	abscisic acid related	8
+GO:0009789	positive regulation of abscisic acid-activated signaling pathway	abscisic acid related	1
+GO:0009850	auxin metabolic process	auxin related	61
+GO:0009851	auxin biosynthetic process	auxin related	40
+GO:0009852	auxin catabolic process	auxin related	7
+GO:0009862	systemic acquired resistance, salicylic acid mediated signaling pathway	SA related	15
+GO:0009863	salicylic acid mediated signaling pathway	SA related	60
+GO:0009864	induced systemic resistance, jasmonic acid mediated signaling pathway	JA related	10
+GO:0009867	jasmonic acid mediated signaling pathway	JA related	95
+GO:0009873	ethylene-activated signaling pathway	ethylene related	124
+GO:0009926	auxin polar transport	auxin related	35
+GO:0010104	regulation of ethylene-activated signaling pathway	ethylene related	26
+GO:0010105	negative regulation of ethylene-activated signaling pathway	ethylene related	21
+GO:0010115	regulation of abscisic acid biosynthetic process	abscisic acid related	7
+GO:0010268	brassinosteroid homeostasis	brassinosteroid related	40
+GO:0010315	auxin export across the plasma membrane	auxin related	28
+GO:0010337	regulation of salicylic acid metabolic process	SA related	16
+GO:0010371	regulation of gibberellin biosynthetic process	gibberelin related	1
+GO:0010476	gibberellin mediated signaling pathway	gibberelin related	67
+GO:0010928	regulation of auxin mediated signaling pathway	auxin related	28
+GO:0016131	brassinosteroid metabolic process	brassinosteroid related	43
+GO:0016132	brassinosteroid biosynthetic process	brassinosteroid related	43
+GO:0045487	gibberellin catabolic process	gibberelin related	16
+GO:0046244	salicylic acid catabolic process	SA related	1
+GO:0046345	abscisic acid catabolic process	abscisic acid related	1
+GO:0060918	auxin transport	auxin related	75
+GO:0060919	auxin import into cell	auxin related	6
+GO:0071215	cellular response to abscisic acid stimulus	abscisic acid related	89
+GO:0071365	cellular response to auxin stimulus	auxin related	394
+GO:0071367	cellular response to brassinosteroid stimulus	brassinosteroid related	103
+GO:0071368	cellular response to cytokinin stimulus	cytokinin related	154
+GO:0071369	cellular response to ethylene stimulus	ethylene related	124
+GO:0071370	cellular response to gibberellin stimulus	gibberelin related	67
+GO:0071395	cellular response to jasmonic acid stimulus	JA related	95
+GO:0071446	cellular response to salicylic acid stimulus	SA related	60
+GO:0080036	regulation of cytokinin-activated signaling pathway	cytokinin related	6
+GO:0080037	negative regulation of cytokinin-activated signaling pathway	cytokinin related	6
+GO:0080140	regulation of jasmonic acid metabolic process	JA related	1
+GO:0080141	regulation of jasmonic acid biosynthetic process	JA related	1
+GO:0080142	regulation of salicylic acid biosynthetic process	SA related	16
+GO:0080162	endoplasmic reticulum to cytosol auxin transport	auxin related	22
+GO:1900457	regulation of brassinosteroid mediated signaling pathway	brassinosteroid related	1
+GO:1900458	negative regulation of brassinosteroid mediated signaling pathway	brassinosteroid related	1
+GO:2000012	regulation of auxin polar transport	auxin related	8
+GO:2000022	regulation of jasmonic acid mediated signaling pathway	JA related	49
+GO:2000031	regulation of salicylic acid mediated signaling pathway	SA related	50
