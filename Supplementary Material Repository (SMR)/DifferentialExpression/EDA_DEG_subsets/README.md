@@ -4,6 +4,8 @@ This folder contains a series of Venn Diagram representations of Differentially 
 - `Intersection_DEG_Embryogenesis_segmented.png`:VM vs SAHA Treated PE and VM vs Ctrl PE DEG lists intersections, separated as well by type of expression (increased or decreased)
 - `Intersection_DEG_all3subsets.png`: all three DEG lists
 
+![alt text](https://github.com/Natpod/Bnapus_ME/blob/main/Supplementary%20Material%20Repository%20(SMR)/DifferentialExpression/EDA_DEG_subsets/Intersection_DEG_Embryogenesis_segmented.png)
+
 It also contains a series of tsv with annotations of each intersecting subset of DEGs of interest
 
 
