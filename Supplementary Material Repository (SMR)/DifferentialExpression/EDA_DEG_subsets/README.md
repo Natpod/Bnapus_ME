@@ -5,3 +5,15 @@ This folder contains a series of Venn Diagram representations of Differentially 
 - `Intersection_DEG_all3subsets.png`: all three DEG lists
 
 It also contains a series of tsv with annotations of each intersecting subset of DEGs of interest
+
+
+| Tables   |      Description      | Approach to biological question |
+|----------|:-------------:|------|
+| `intersec_all3subsets.tsv` | DEGs intersecting across the three lists (Proembryo SAHA treatment, ME with and without SAHA treatment)  | conserved DEGs |
+| `intersec_HeatStress_Embryogenesis_outersec_PE_treatment.tsv` | DEGs intersecting across ME DEG lists, but not PE SAHA treatment DEG list  | conserved DEGs only in Embryogenesis |
+| `intersec_SAHA_treatment_outersec_HeatStress.tsv` | DEGs intersecting across SAHA treatment DEG lists, but not conventional Embryogenesis "HeatStress" DEG list | conserved DEGs in SAHA treatment |
+| `intersec_Embryogenesis_all.tsv` | DEGs intersecting across Embryogenesis lists "HeatStress" and "HeatStress-SAHA" | conserved DEGs in Embryogenesis |
+| `outersec_Embryogenesis_in_HeatStress.tsv` | DEGs in Conventional Embryogenesis list "HeatStress" that are not observed with SAHA treatment in "HeatStress-SAHA" DEG list | SAHA effect in Embryogenesis |
+| `outersec_Embryogenesis_in_HeatStress_SAHA.tsv` |  DEGs in Embryogenesis with SAHA treatment that are not observed with Conventional HeatStress-only treatment in "HeatStress" DEG list | SAHA effect in Embryogenesis |
+| `intersec_Embryogenesis_DOWN_HeatStress_SAHA_UP_Heatstress_all.tsv` | DEGs that are downregulated in Embryogenesis with SAHA treatment but upregulated in Conventional Embryogenesis | SAHA effect in Embryogenesis |
+    
