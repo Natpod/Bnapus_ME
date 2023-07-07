@@ -11,7 +11,7 @@ This is done in order to uncover mechanisms underlying in our expression data, m
 This section contains the following scripts
 | Code  | Pipeline Stage  | Description  |
 |---|---|---|
-| `gsea_V2`  |   |   |   
+| `GSEA`  | GeneEnricment  | Performs GSEA in the three lists, for the selected hormone and epigenetic terms  |   
 | `gsva.Rmd`  | Functional Enrichment Analysis  |  Performs Gene Set Variation Analysis (GSVA) on batch adjusted matrix expression data from both experiments | 
 | `GSVA_viz.ipynb`  | Functional Enrichment Analysis  | Visualizes GSVA resuts | 
 | `ORA.Rmd`  | Functional Enrichment Analysis  | Performs ORA over list of HDACi/Stress DEGs, visualizes the result |  
