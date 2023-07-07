@@ -3,23 +3,6 @@
 
 
 # Install biomcmanager dependencies
-
-install.packages("BiocManager")
-BiocManager::install(version = "3.17")
-#install.packages("org.Hs.eg.db", repos="http://bioconductor.org/packages/3.2/data/annotation")
-BiocManager::install("impute")
-BiocManager::install("preprocessCore")
-BiocManager::install("DESeq2")
-BiocManager::install("biomaRt")
-BiocManager::install("biomartr")
-BiocManager::install("org.Mm.eg.db")
-BiocManager::install("minet")
-remotes::install_github("jtlovell/limmaDE2") # requires install.packages("venneuler")  as a dependency
-
-#remotes::install_github("kevinblighe/CorLevelPlot")
-#install.packages("WGCNA", dependencies = TRUE)
-
-         # allow multi-threading (optional)
 library(WGCNA)
 library(DESeq2)
 library(tidyverse)
