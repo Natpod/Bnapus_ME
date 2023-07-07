@@ -324,18 +324,19 @@ sign_colors = gsub("ME", "",sign_modules)
 
 
 x11(type="cairo")
-png("/home/famgarcia/Escritorio/modcorr_signednet.png", width=18, height=25, units="cm", res=300)
-par(mar=c(8,8,0.5,1.5))
+svg("/home/famgarcia/Escritorio/modcorr_signednet.svg", width=15, height=23)
+par(mar=c(16,16,16,16))
 labeledHeatmap(Matrix=module.trait.corr[,],
                xLabels=t(as.data.frame(names(heatmap.data)[c(21,22,23)])),
                yLabels=names(heatmap.data)[1:20],
                ySymbols=gsub("ME","",names(heatmap.data)[1:20]),
                colorLabels = FALSE,
+               cex.lab = 2.5,
                colors=blueWhiteRed(50),
                textMatrix=textMatrix,
                setStdMargins = FALSE,
-               cex.text=1,
-               zlim=c(-1,1)) + geom_raster() + scale_fill_identity()
+               cex.text=1.9,
+               zlim=c(-1,1)) + geom_raster() + scale_fill_identity() + theme(plot.margin = c(8,8,8,8))
 dev.off()
 
 # lightyellow module is of biological interest to analyze SAHA treatment effects on corregulation network (significant module associated to that trait)
