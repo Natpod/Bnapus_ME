@@ -31,10 +31,10 @@ You can use some of the functionalities provided for some of the steps in this p
 ```
 git clone https://github.com/YOUR-USERNAME/Bnapus_ME.git
 ```
-To install dependencies required by the helper scripts, you should execute the following line with pip package manager, or manage your own conda environments using the dependencies described in `requirements.txt`
+To install dependencies required by the helper scripts, you should execute the following line with pip package manager, or manage your own conda environments using the dependencies described in `requirements_python.txt`
 
 ```
-pip install requirements.txt
+pip install requirements_python.txt
 ```
 To view examples of how to implement different steps of the pipeline, you can find them in the `examples` folder.
 
