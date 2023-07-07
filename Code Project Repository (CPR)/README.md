@@ -11,6 +11,9 @@
 - Quantification of expression : HTSeq - HTSeqCount, NormalizationPipeline.sh (R source)
 - Differential expression analysis : DeSeq2
 - Gene enrichment : clusterProfiler, bioMaRt
+- Batch correction : Combat-seq
+- Coexpression Analysis : WGCNA
+
 
 ---
 ## General Information
@@ -32,18 +35,11 @@
 
 | Folder  | Code's aim |
 | - |-|
-| Annotation retrieval | Retrieval of annotations of miRNA in genomic gff, ATG autophagy related genes, Oxidative stress genes |
-| QC and Filtering |  |
-| Mapping |  |
-| Quantification of expression | |
-| DE analysis | |
+| AnnotationRetrieval | Retrieval of annotations of miRNA in genomic gff, ATG autophagy related genes, Oxidative stress genes |
+| RNAseq_pipeline_first_steps| Scripts relative to trimming, QC, mapping to a reference genome, read count and normalization |
+| DifferentialExpression | Scripts relative to applying statistical inference and methods for inference of Differential Expression  |
+| GeneEnrichment | Applying algorithms to get a measure of statistical significance of overrepresentation of genes belonging to a curated biological category through (ORA, GSEA, GSVA) |
+| Coexpression Network WGCNA | Scripts relative to inference of coexpression among genes and conversion into a regulatory network separating genes by coexpression modules. Batch effect correction of expression data prior to this process is also included in this folder| 
+| List generation | A collection of hormone pathways /Epigenetic mechanism terms used to filter genes |
 
 
-## Data summary
-
-|Version|Data source name | Detailed description | 
-|-----------------|--------|----------------------|
-|v.0.0.1|||
-|v.0.0.1|| |
-|v.0.0.1|||
-|v.0.0.1|||
