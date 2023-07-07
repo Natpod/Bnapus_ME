@@ -317,15 +317,15 @@ write.table(not_common_HS, "/home/famgarcia/Escritorio/outersec_Embryogenesis_in
 # b) segmentating by repression / activation
 ################################ MAKE VENN DEG
 x <- list(
-  HeatStress_SAHA_UP = expr_HDAC_Stress[expr_HDAC_Stress$lfc_HeatStress_SAHA> 0, 3], 
-  HeatStress_SAHA_DOWN  = expr_HDAC_Stress[expr_HDAC_Stress$lfc_HeatStress_SAHA < 0, 3], 
-  HeatStress_DOWN = expr_Stress[(expr_Stress$lfc_HeatStress < 0) , 3],
-  HeatStress_UP = expr_Stress[expr_Stress$lfc_HeatStress > 0 ,3]
+  "HeatStress-SAHA UP" = expr_HDAC_Stress[expr_HDAC_Stress$log2FoldChange> 0, ]$external_gene_name, 
+  "HeatStress-SAHA DOWN"  = expr_HDAC_Stress[expr_HDAC_Stress$log2FoldChange < 0, ]$external_gene_name, 
+  "HeatStress DOWN" = expr_Stress[(expr_Stress$log2FoldChange < 0) , ]$external_gene_name,
+  "HeatStress UP" = expr_Stress[expr_Stress$log2FoldChange > 0 ,]$external_gene_name
 )
 
-png("/home/famgarcia/Escritorio/Intersection_DEG_Embryogenesis_segmented.png", width=16, height=12, units="cm", res=300)
+svg("/home/famgarcia/Escritorio/Intersection_DEG_Embryogenesis_segmented.svg", width=10, height=7)
 par(mar=c(0,3,1.5,1))
-ggVennDiagram(x, label_alpha = 0, edge_size = 0.3, set_size=3,
+ggVennDiagram(x, label_alpha = 0, edge_size = 0.3, set_size=6,
               set_color=c("ME_HDACi_UP" = "lightcoral", "ME_HDACi_DOWN" = "green4", "ME_DOWN" = "steelblue", "ME_UP" = "purple")
 ) + scale_fill_gradient(low="white",high = "tan") + 
   theme(legend.position="none",) + # no legend
