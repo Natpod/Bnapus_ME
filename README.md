@@ -36,6 +36,10 @@ To install dependencies required by the helper scripts, you should execute the f
 ```
 pip install requirements_python.txt
 ```
+And to install R requirements
+```
+Rscript requirements_R.R
+```
 To view examples of how to implement different steps of the pipeline, you can find them in the `examples` folder.
 
 ### List of Authors
