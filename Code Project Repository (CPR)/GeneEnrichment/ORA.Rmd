@@ -28,6 +28,9 @@ library(tidyverse)
 library(geneset)
 library(genekitr)
 library(data.table)
+library("rrvgo")
+library("igraph")
+library("ggraph")
 suppressPackageStartupMessages(library("KEGGgraph"))
 suppressWarnings(suppressPackageStartupMessages(library("fgsea")))
 ```
@@ -39,7 +42,6 @@ Load available AnnotationHub Brassica napus annotation object to construct an Or
 library("AnnotationForge")
 library("AnnotationDbi")
 library("AnnotationHub")
-library("OrgDB")
 
 # Making annotation package
 ah <- AnnotationHub()
@@ -59,6 +61,10 @@ A collection of gene - DeSeq2 Wald statistic pair values is used in a `.rnk` fil
 (Enter wald statistic formula : (/Zscore))
 
 ```{r cars}
+
+ranks_HDAC_Stress <- read.csv("C:\\Users\\naata\\MASTER\\Enrichment\\Rank_T_vs_VM.rnk",
+                              header=FALSE, colClasses = c("character", "numeric"))
+
 ranks_HDAC <- read.csv("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\bna_HDAC_deseq2stat.rnk",
                     header=FALSE, colClasses = c("character", "numeric"))
 
@@ -67,44 +73,34 @@ ranks_Stress <- read.csv("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthet
                     header=FALSE, colClasses = c("character", "numeric"))
 
 # We'll extract the background genes - the genes detected with over log10(counts)>1
-
-background_ALL_gl_HDAC <- as.data.frame(ranks_HDAC[,1])
-background_ALL_gl_Stress <- as.data.frame(ranks_Stress[,1])
-
-background_UP_gl_HDAC <- as.data.frame(ranks_HDAC[which(ranks_HDAC[,2] > 0), 1])
-background_UP_gl_Stress <- as.data.frame(ranks_Stress[which(ranks_Stress[,2] > 0), 1])
-
-background_DOWN_gl_HDAC <- as.data.frame(ranks_HDAC[which(ranks_HDAC[,2] < 0), 1])
-background_DOWN_gl_Stress <- as.data.frame(ranks_Stress[which(ranks_Stress[,2] < 0), 1])
-
-```
-
-## Preprocessing data
-
-```{r pressure, echo=FALSE}
-
-
 # Remove duplicates (transcript isoform with more differential expression will be conserved from the same gene)
 ranks_HDAC <- ranks_HDAC[!duplicated(ranks_HDAC[,1]),]
 ranks_Stress <- ranks_Stress[!duplicated(ranks_Stress[,1]),]
+ranks_HDAC_Stress <- ranks_HDAC_Stress[!duplicated(ranks_HDAC_Stress[,1]),]
 
-# Labelling columns (gene_name "ID" and statistic "t")
-colnames(ranks_HDAC) <-c("ID","t")
-colnames(ranks_Stress) <-c("ID","t")
 
-# Sorting and creating ordered gene ranks column
-ranks_HDAC <- ranks_HDAC %>% mutate(rank = rank(t,  ties.method = "random"))
-ranks_HDAC <- ranks_HDAC[order(ranks_HDAC$rank, decreasing=TRUE), ]
+background_ALL_gl_HDAC <- as.data.frame(ranks_HDAC[,1])
+background_ALL_gl_Stress <- as.data.frame(ranks_Stress[,1])
+background_ALL_gl_HDAC_Stress <- as.data.frame(ranks_HDAC_Stress[,1])
 
-ranks_Stress <- ranks_Stress %>% mutate(rank = rank(t,  ties.method = "random"))
-ranks_Stress <- ranks_Stress[order(ranks_Stress$rank, decreasing=TRUE), ]
+background_UP_gl_HDAC <- as.data.frame(ranks_HDAC[which(ranks_HDAC[,2] > 0), 1])
+background_UP_gl_Stress <- as.data.frame(ranks_Stress[which(ranks_Stress[,2] > 0), 1])
+background_UP_gl_HDAC_Stress <- as.data.frame(ranks_HDAC_Stress[which(ranks_HDAC_Stress[,2] > 0), 1])
 
-# Converting to set of lists
-ranks_HDAC <- setNames(ranks_HDAC$t, ranks_HDAC$ID)
-ranks_Stress <- setNames(ranks_Stress$t, ranks_Stress$ID)
-
+background_DOWN_gl_HDAC <- as.data.frame(ranks_HDAC[which(ranks_HDAC[,2] < 0), 1])
+background_DOWN_gl_Stress <- as.data.frame(ranks_Stress[which(ranks_Stress[,2] < 0), 1])
+background_DOWN_gl_HDAC_Stress <- as.data.frame(ranks_HDAC_Stress[which(ranks_HDAC_Stress[,2] < 0), 1])
 
 ```
+
+```{r}
+
+hormone_terms = read_excel("C:\\Users\\naata\\Documents\\MASTER\\TFM\\tfm\\final_list_GO_lookup.xlsx", sheet="hormonal_screening")
+epi_terms = read_excel("C:\\Users\\naata\\Documents\\MASTER\\TFM\\tfm\\final_list_GO_lookup.xlsx", sheet="epigenetic_screening")
+
+```
+
+
 
 # Loading pathways and background gene set
 
@@ -114,7 +110,7 @@ ranks_Stress <- setNames(ranks_Stress$t, ranks_Stress$ID)
 
 # Biological Process
 
-ml_BP_GO <- readRDS("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_genesets.rds")
+ml_BP_GO <- readRDS("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_genesets_noorth.rds")
 ml_CC_GO <- readRDS("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_genesets.rds")
 ml_MF_GO <- readRDS("C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_genesets.rds")
 
@@ -160,9 +156,14 @@ pathways_MF_gs<-do.call(rbind,  tmp_list)
 colnames(pathways_MF_gs)=c("mf", "gene")
 
 
+# KEGG
+pathways_KEGG_gs <- read.csv('C:\\Users\\naata\\Documents\\MASTER\\TFM\\tfm\\KEGG_gs_pairs.csv')
+
+
 pathways_BP_terms <-read.csv('C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_bp_terms.csv')
 pathways_MF_terms <-read.csv('C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_mf_terms.csv')
 pathways_CC_terms <-read.csv('C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\synthetic_env\\GSEA\\full_cc_terms.csv')
+pathways_KEGG_terms <-read.csv('C:\\Users\\naata\\Documents\\MASTER\\TFM\\tfm\\KEGG_gs_descriptions.csv')
 
 ```
 
@@ -170,18 +171,25 @@ pathways_CC_terms <-read.csv('C:\\Users\\naata\\Documents\\MASTER\\BioSynth\\syn
 
 # Import results from DeSeq2 analysis
 ```{r}
-DEG_HDAC<-read_excel("C:\\Users\\naata\\MASTER\\Enrichment\\Filtered_DEG_LFC1_padj05_results_total.xlsx")
+
+DEG_HDAC<-read.table("C:\\Users\\naata\\Downloads\\Final_Condition_T_vs_C_LFC1_padj05.tsv", sep="\t", header = TRUE)
 DEG_Stress <-read_csv("C:\\Users\\naata\\MASTER\\Enrichment\\Final_condition_PErep_vs_VMrep_padj0.05_woPErep3_LFC1filtered.csv")
+DEG_HDAC_Stress<- read.table("C:\\Users\\naata\\MASTER\\Enrichment\\Condition_T_vs_VM_result_padj_0.05_DevStage.csv", sep= ",", header=TRUE)
+
 
 DEG_ALL_HDAC <- DEG_HDAC$external_gene_name
 DEG_ALL_Stress <- DEG_Stress$external_gene_name
-
-DEG_UP_HDAC <- DEG_HDAC[which(DEG_HDAC$log2FoldChange > 0),]$external_gene_name
-DEG_UP_Stress <- DEG_Stress[which(DEG_Stress$log2FoldChange > 0),]$external_gene_name
+DEG_ALL_HDAC_Stress <- DEG_HDAC_Stress$external_gene_name
 
 
-DEG_DOWN_HDAC <- DEG_HDAC[which(DEG_HDAC$log2FoldChange < 0),]$external_gene_name
-DEG_DOWN_Stress <- DEG_Stress[which(DEG_Stress$log2FoldChange < 0),]$external_gene_name
+DEG_UP_HDAC <- DEG_HDAC[which(DEG_HDAC$log2FoldChange > 1),]$external_gene_name
+DEG_UP_Stress <- DEG_Stress[which(DEG_Stress$log2FoldChange > 1),]$external_gene_name
+DEG_UP_HDAC_Stress <- DEG_HDAC_Stress[which(DEG_HDAC_Stress$log2FoldChange > 1),]$external_gene_name
+
+
+DEG_DOWN_HDAC <- DEG_HDAC[which(DEG_HDAC$log2FoldChange < -1),]$external_gene_name
+DEG_DOWN_Stress <- DEG_Stress[which(DEG_Stress$log2FoldChange < -1),]$external_gene_name
+DEG_DOWN_HDAC_Stress <- DEG_HDAC_Stress[which(DEG_HDAC_Stress$log2FoldChange < -1),]$external_gene_name
 
 ```
 
@@ -196,13 +204,23 @@ bckgr_geneset_HDAC <- merge(background_ALL_gl_HDAC, pathways_BP_gs, by="gene")
 colnames(background_ALL_gl_Stress) = "gene"
 bckgr_geneset_Stress <- merge(background_ALL_gl_Stress, pathways_BP_gs, by="gene")
 
+colnames(background_ALL_gl_HDAC_Stress) = "gene"
+bckgr_geneset_HDAC_Stress <- merge(background_ALL_gl_HDAC_Stress, pathways_BP_gs, by="gene")
+
+
 colnames(bckgr_geneset_HDAC)<-c("ID","bp")
 bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
 colnames(bckgr_geneset_Stress)<-c("ID","bp")
 bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
 
-ORA_HDAC_ALL <- clusterProfiler::enricher(gene = DEG_ALL_HDAC, minGSSize=2, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_BP_terms)
-ORA_Stress <- clusterProfiler::enricher(gene = DEG_ALL_Stress, minGSSize=2, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_BP_terms)
+colnames(bckgr_geneset_HDAC_Stress)<-c("ID","bp")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+ORA_HDAC_ALL <- clusterProfiler::enricher(gene = DEG_ALL_HDAC, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_BP_terms)
+ORA_Stress <- clusterProfiler::enricher(gene = DEG_ALL_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_BP_terms)
+ORA_HDAC_Stress <- clusterProfiler::enricher(gene = DEG_ALL_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC_Stress, TERM2NAME = pathways_BP_terms)
+
 
 ORA_HDAC_ALL@organism="bnapus"
 ORA_HDAC_ALL@ontology="BP"
@@ -210,82 +228,825 @@ ORA_HDAC_ALL@ontology="BP"
 ORA_Stress@organism="bnapus"
 ORA_Stress@ontology="BP"
 
-
-
+ORA_HDAC_Stress@organism="bnapus"
+ORA_HDAC_Stress@ontology="BP"
 
 
 HDAC_all <- importCP(ORA_HDAC_ALL, type = "other")
-write_csv(HDAC_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HDAC_ALL_Results.csv")
+write_csv(HDAC_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_PE-SAHA_ALL_Results.csv")
 
 Stress_all <- importCP(ORA_Stress, type = "other")
-write_csv(Stress_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_Stress_ALL_Results.csv")
+write_csv(Stress_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_ALL_Results.csv")
+
+HDAC_Stress_all <- importCP(ORA_HDAC_Stress, type = "other")
+write_csv(HDAC_Stress_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress-SAHA_ALL_Results.csv")
+
+
+
+##################### UP REGULATED GENES
+
+colnames(background_UP_gl_HDAC) = "gene"
+bckgr_geneset_HDAC <- merge(background_UP_gl_HDAC, pathways_BP_gs, by="gene")
+colnames(bckgr_geneset_HDAC)<-c("bp","ID")
+bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
+
+colnames(background_UP_gl_Stress)<-c("gene")
+bckgr_geneset_Stress <- merge(background_UP_gl_Stress, pathways_BP_gs, by="gene")
+colnames(bckgr_geneset_Stress)<-c("bp","ID")
+bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
+
+
+colnames(background_UP_gl_HDAC_Stress) = "gene"
+bckgr_geneset_HDAC_Stress <- merge(background_UP_gl_HDAC_Stress, pathways_BP_gs, by="gene")
+colnames(bckgr_geneset_HDAC_Stress)<-c("bp","ID")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+
+
+ORA_HDAC_UP <- clusterProfiler::enricher(gene = DEG_UP_HDAC, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_BP_terms)
+ORA_Stress_UP <- clusterProfiler::enricher(gene = DEG_UP_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_BP_terms)
+ORA_HDAC_Stress_UP <- clusterProfiler::enricher(gene = DEG_UP_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_BP_terms)
+
+
+
+ORA_HDAC_UP@organism="bnapus"
+ORA_HDAC_UP@ontology="BP"
+
+ORA_Stress_UP@organism="bnapus"
+ORA_Stress_UP@ontology="BP"
+
+ORA_HDAC_Stress_UP@organism="bnapus"
+ORA_HDAC_Stress_UP@ontology="BP"
+
+
+
+HDAC_up <- importCP(ORA_HDAC_UP, type = "other")
+write_csv(HDAC_up, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_PE_SAHA_up_Results.csv")
+
+Stress_up <- importCP(ORA_Stress_UP, type = "other")
+write_csv(Stress_up, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_up_Results.csv")
+
+HDAC_Stress_up <- importCP(ORA_HDAC_Stress_UP, type = "other")
+write_csv(HDAC_Stress_up, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_SAHA_up_Results.csv")
+
+
+
+############################### DOWNREGULATED GENES
+
+colnames(background_DOWN_gl_HDAC) = "gene"
+bckgr_geneset_HDAC <- merge(background_DOWN_gl_HDAC, pathways_BP_gs, by="gene")
+
+colnames(background_DOWN_gl_Stress) = "gene"
+bckgr_geneset_Stress <- merge(background_DOWN_gl_Stress, pathways_BP_gs, by="gene")
+
+colnames(background_DOWN_gl_HDAC_Stress) = "gene"
+bckgr_geneset_HDAC_Stress <- merge(background_DOWN_gl_HDAC_Stress, pathways_BP_gs, by="gene")
+
+
+colnames(bckgr_geneset_HDAC)<-c("ID","bp")
+bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
+colnames(bckgr_geneset_Stress)<-c("ID","bp")
+bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
+
+colnames(bckgr_geneset_HDAC_Stress)<-c("ID","bp")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+
+
+ORA_HDAC_DOWN <- clusterProfiler::enricher(gene = DEG_DOWN_HDAC, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_BP_terms)
+ORA_Stress_DOWN <- clusterProfiler::enricher(gene = DEG_DOWN_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_BP_terms)
+ORA_HDAC_Stress_DOWN <- clusterProfiler::enricher(gene = DEG_DOWN_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_BP_terms)
+
+
+ORA_HDAC_DOWN@organism="bnapus"
+ORA_HDAC_DOWN@ontology="BP"
+
+ORA_Stress_DOWN@organism="bnapus"
+ORA_Stress_DOWN@ontology="BP"
+
+ORA_HDAC_Stress_DOWN@organism="bnapus"
+ORA_HDAC_Stress_DOWN@ontology="BP"
+
+
+
+HDAC_down <- importCP(ORA_HDAC_DOWN, type = "other")
+write_csv(HDAC_down, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_PE_SAHA_down_Results.csv")
+
+Stress_down <- importCP(ORA_Stress_DOWN, type = "other")
+write_csv(Stress_down, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_down_Results.csv")
+
+HDAC_Stress_down <- importCP(ORA_HDAC_Stress_DOWN, type = "other")
+write_csv(HDAC_Stress_down, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_SAHA_down_Results.csv")
+
+
+
+
+
+
+
+
+
+```
+
+```{r}
+# Calculate similarity matrix
+simMatrix_HDACi <- calculateSimMatrix(HDAC_up$ID,
+                                orgdb=org.Brassicanapus.eg.db,
+                                ont="BP",
+                                method="Wang")
+# Reducing terms
+scores <- setNames(-log10(HDAC_up$qvalue), HDAC_up$ID)
+reducedTerms_HDAC <- reduceSimMatrix(simMatrix_HDACi,
+                                scores,
+                                threshold=0.9,
+                                orgdb=org.Brassicanapus.eg.db)
+
+HDAC_up_plot = HDAC_up[HDAC_up$ID %in% reducedTerms_HDAC$parent,]
+HDAC_up_plot_2 = HDAC_up[HDAC_up$ID %in% reducedTerms_HDAC$parent,]
+
+
+
+plotEnrichAdv(HDAC_up_plot, HDAC_down, plot_type = "one") + theme(panel.background = element_rect(fill="#ECFFDC"))
+
+HDAC_up_plot$Description =  gsub("regulation", "reg.", HDAC_up_plot$Description)
+HDAC_up_plot$Description =  gsub("process", "proc.", HDAC_up_plot$Description)
+HDAC_up_plot$Description =  gsub("metabolic process", "met.proc.", HDAC_up_plot$Description)
+HDAC_up_plot$Description =  gsub("catabolic process", "cat.proc.", HDAC_up_plot$Description)
+HDAC_up_plot$Description =  gsub("phosphoenolpyruvate", "PEP", HDAC_up_plot$Description)
+HDAC_up_plot$Description =  gsub("between organisms", "", HDAC_up_plot$Description)
+HDAC_up_plot$Description =  gsub("between organisms", "", HDAC_up_plot$Description)
+HDAC_up_plot$Description = gsub("Erythrose", "\n\nErythrose", HDAC_up_plot$Description)
+HDAC_up_plot$Description = gsub("Biological Process", "BP", HDAC_up_plot$Description)
+HDAC_down$Description = gsub("non-coding RNA", "ncRNA", HDAC_down$Description)
+HDAC_down$Description = gsub("DNA methylation", "DNA methyl.", HDAC_down$Description)
+HDAC_down$Description = gsub("organization", "org.", HDAC_down$Description)
+HDAC_down$Description = gsub("formation", "form.", HDAC_down$Description)
+HDAC_down$Description = gsub("epigenetic", "epig.", HDAC_down$Description)
+
+
+
+
+svg("C:\\Users\\naata\\Downloads\\GO_BP_up_down_f20.svg", width=6.15, height=4)
+plotEnrichAdv(HDAC_up_plot[1:20,], HDAC_down, stats_metric="p.adjust", term_metric = 'FoldEnrichment', plot_type = "one", xlim_left=-16, xlim_right = 13, color=c("#00A36C","coral")) + labs(caption = "GO Biological Process") + theme(panel.background = element_rect(fill="#ECFFDC"), panel.border = element_blank())
+dev.off()
+
+
+svg("C:\\Users\\naata\\Downloads\\GO_BP_up_down_two.svg", width=15, height=6)
+plotEnrichAdv(HDAC_up_plot, HDAC_down, stats_metric="p.adjust", term_metric = 'Count', plot_type = "two", xlim_left=-16, xlim_right = 13, color=c("coral", "grey","#00A36C", "grey")) + labs(title = "GO Biological Process") + theme(panel.background = element_rect(fill="#ECFFDC"), panel.border = element_blank(), text=element_text(color="green"))
+dev.off()
+
+
+
+svg("C:\\Users\\naata\\Downloads\\GO_CC_up_down.svg", width=5.55, height=3)
+plotEnrichAdv(HDAC_CC_UP, HDAC_CC_DOWN, stats_metric="p.adjust", term_metric = 'FoldEnrichment', plot_type = "one", xlim_left=-16.1, xlim_right = 15, color=c("#00A36C","coral")) + labs(caption = "GO Cellular Component") + theme(panel.background = element_rect(fill="#FCDCC8"), panel.border = element_blank())
+dev.off()
+
+
+
+
+
+HDAC_MF_UP$Description = gsub("activity", "act.", HDAC_MF_UP$Description)
+HDAC_MF_UP$Description = gsub("reduction", "reduct", HDAC_MF_UP$Description)
+HDAC_MF_UP$Description = gsub("incorporation", "inc.", HDAC_MF_UP$Description)
+HDAC_MF_UP$Description = gsub("oxygen", "O", HDAC_MF_UP$Description)
+HDAC_MF_UP$Description = gsub("donor", "d", HDAC_MF_UP$Description)
+HDAC_MF_UP$Description = gsub("acceptor", "acc", HDAC_MF_UP$Description)
+HDAC_MF_UP$Description = gsub("transferase act.,", "", HDAC_MF_UP$Description)
+HDAC_MF_UP$Description = gsub("Oxidorreductase", "Oxidorred.", HDAC_MF_UP$Description)
+HDAC_MF_UP = HDAC_MF_UP[!(grepl("acting on", HDAC_MF_UP$Description)),]
+
+HDAC_MF_DOWN$Description = gsub("activity", "act.", HDAC_MF_DOWN$Description)
+
+
+
+svg("C:\\Users\\naata\\Downloads\\GO_MF_up_down_f20.svg", width=6.15, height=4)
+plotEnrichAdv(HDAC_MF_UP[1:20,], HDAC_MF_DOWN, stats_metric="p.adjust", term_metric = 'FoldEnrichment', plot_type = "one", xlim_left=-18.1, xlim_right = 18, color=c("#00A36C","coral")) + labs(caption = "GO Molecular Function") + theme(panel.background = element_rect(fill="#FFFDE3"), panel.border = element_blank())
+dev.off()
+
+# svg("C:\\Users\\naata\\Downloads\\GO_KEGG_up_down_f20.svg", width=6.15, height=7)
+# plotEnrich(HDAC_KEGG_UP[1:20,], stats_metric="p.adjust", term_metric = 'Count', plot_type = "bar", xlim_left=0, xlim_right = 20) + labs(caption = "KEGG") + theme(panel.background = element_rect(fill="#FFFDE3"), panel.border = element_blank())
+# dev.off()
+
+svg("C:\\Users\\naata\\Downloads\\GO_KEGG_up_down.svg", width=5.15, height=1.75)
+ggplot(HDAC_KEGG_UP, aes(x = -log10(p.adjust), y = reorder(Description,-log10(p.adjust)))) + 
+  geom_bar(stat="identity",fill="coral", width=0.7) +
+  theme_bw(base_size = 14) +
+  ylab(NULL) +
+  labs(caption = "KEGG pathways") +theme_minimal()+theme(panel.grid.minor=element_blank(), 
+                                                         panel.grid.major=element_blank(), 
+                                                         axis.text.y=element_text(colour="black"),
+                                                         axis.title.y=element_text(size=10),
+                                                         panel.background = element_rect(fill="#bae1ff",linewidth = 0),
+                                                         plot.background = element_rect(fill="#bae1ff",linewidth = 0),
+                                                         panel.border = element_blank())
+dev.off()
+
+
+
+
+
+
+
+HDAC_Stress_all[HDAC_Stress_all$ID %in% Stress_all$ID,]
+
+
+
+
+svg("C:\\Users\\naata\\Downloads\\GO_MF_up_down_f20.svg", width=6.15, height=4)
+plotEnrichAdv(HDAC_MF_UP[1:20,], HDAC_MF_DOWN, stats_metric="p.adjust", term_metric = 'FoldEnrichment', plot_type = "one", xlim_left=-18.1, xlim_right = 18, color=c("#00A36C","coral")) + labs(caption = "GO Molecular Function") + theme(panel.background = element_rect(fill="#FFFDE3"), panel.border = element_blank())
+dev.off()
+
+
+
+
+
+
+######################## ME COMPARISON
+
+
+
+# Calculate similarity matrix
+simMatrix_HDACi <- calculateSimMatrix(HDAC_Stress_all$ID,
+                                orgdb=org.Brassicanapus.eg.db,
+                                ont="BP",
+                                method="Wang")
+# Reducing terms
+scores <- setNames(-log10(HDAC_Stress_all$qvalue), HDAC_Stress_all$ID)
+reducedTerms_HDAC <- reduceSimMatrix(simMatrix_HDACi,
+                                scores,
+                                threshold=0.7,
+                                orgdb=org.Brassicanapus.eg.db)
+
+HSSAHA_toplot = HDAC_Stress_all[HDAC_Stress_all$ID %in% reducedTerms_HDAC$parent,]
+
+p_BP_SAHA = plotEnrich(HSSAHA_toplot, plot_type="lollipop", up_color = "coral", down_color ="grey", scale_ratio = 0.03 ) + labs(title = "HeatStress-SAHA") + theme(panel.background = element_rect(fill="#ECFFDC"), panel.border = element_blank())
+
+# Calculate similarity matrix
+simMatrix_HDACi <- calculateSimMatrix(Stress_all$ID,
+                                orgdb=org.Brassicanapus.eg.db,
+                                ont="BP",
+                                method="Wang")
+# Reducing terms
+scores <- setNames(-log10(Stress_all$qvalue), Stress_all$ID)
+reducedTerms_HDAC <- reduceSimMatrix(simMatrix_HDACi,
+                                scores,
+                                threshold=0.7,
+                                orgdb=org.Brassicanapus.eg.db)
+
+HS_toplot = Stress_all[Stress_all$ID %in% reducedTerms_HDAC$parent,]
+
+p_BP_Stress = plotEnrich(HS_toplot , plot_type="lollipop", up_color = "coral", down_color ="grey", scale_ratio = 0.03) + labs(title = "HeatStress") + theme(panel.background = element_rect(fill="#ECFFDC"), panel.border = element_blank())
+
+
+row_BP_comp = ggarrange(p_BP_SAHA, p_BP_Stress, ncol=2, widths=c(5.5, 5))
+ggsave("C:\\Users\\naata\\Downloads\\ME_comparison_BP.svg", row_BP_comp, width=11, height=5)
+
+
+
+
+
+# Calculate similarity matrix
+simMatrix_HDACi <- calculateSimMatrix(HDAC_Stress_CC_all$ID,
+                                orgdb=org.Brassicanapus.eg.db,
+                                ont="CC",
+                                method="Wang")
+# Reducing terms
+scores <- setNames(-log10(HDAC_Stress_CC_all$qvalue), HDAC_Stress_CC_all$ID)
+reducedTerms_HDAC <- reduceSimMatrix(simMatrix_HDACi,
+                                scores,
+                                threshold=0.4,
+                                orgdb=org.Brassicanapus.eg.db)
+
+HSSAHA_toplot_CC = HDAC_Stress_CC_all[HDAC_Stress_CC_all$ID %in% reducedTerms_HDAC$parent,]
+
+p_CC_SAHA = plotEnrich(HSSAHA_toplot_CC, plot_type="lollipop", up_color = "coral", down_color ="grey", scale_ratio = 0.03 ) + theme(panel.background = element_rect(fill="#FCDCC8"), panel.border = element_blank())
+
+# Calculate similarity matrix
+simMatrix_HDACi <- calculateSimMatrix(Stress_CC_all$ID,
+                                orgdb=org.Brassicanapus.eg.db,
+                                ont="CC",
+                                method="Wang")
+# Reducing terms
+scores <- setNames(-log10(Stress_CC_all$qvalue), Stress_CC_all$ID)
+reducedTerms_HDAC <- reduceSimMatrix(simMatrix_HDACi,
+                                scores,
+                                threshold=0.4,
+                                orgdb=org.Brassicanapus.eg.db)
+
+HS_toplot_CC = Stress_CC_all[Stress_CC_all$ID %in% reducedTerms_HDAC$parent,]
+
+p_CC_Stress = plotEnrich(HS_toplot_CC , plot_type="lollipop", up_color = "coral", down_color ="grey", scale_ratio = 0.03) + theme(panel.background = element_rect(fill="#FCDCC8"), panel.border = element_blank())
+
+
+row_CC_comp = ggarrange(p_CC_SAHA, p_CC_Stress, ncol=2, widths=c(5.5, 5))
+ggsave("C:\\Users\\naata\\Downloads\\ME_comparison_CC.svg", row_CC_comp, width=11, height=4.2)
+
+
+
+
+# Calculate similarity matrix
+simMatrix_HDACi <- calculateSimMatrix(HDAC_Stress_MF_all$ID,
+                                orgdb=org.Brassicanapus.eg.db,
+                                ont="MF",
+                                method="Wang")
+# Reducing terms
+scores <- setNames(-log10(HDAC_Stress_MF_all$qvalue), HDAC_Stress_MF_all$ID)
+reducedTerms_HDAC <- reduceSimMatrix(simMatrix_HDACi,
+                                scores,
+                                threshold=0.8,
+                                orgdb=org.Brassicanapus.eg.db)
+
+HSSAHA_toplot_MF = HDAC_Stress_MF_all[HDAC_Stress_MF_all$ID %in% reducedTerms_HDAC$parent,]
+
+p_MF_SAHA = plotEnrich(HSSAHA_toplot_MF, plot_type="lollipop", up_color = "coral", down_color ="grey", scale_ratio = 0.03 ) + theme(panel.background = element_rect(fill="#FFFDE3"), panel.border = element_blank())
+
+# Calculate similarity matrix
+simMatrix_HDACi <- calculateSimMatrix(Stress_MF_all$ID,
+                                orgdb=org.Brassicanapus.eg.db,
+                                ont="MF",
+                                method="Wang")
+# Reducing terms
+scores <- setNames(-log10(Stress_MF_all$qvalue), Stress_MF_all$ID)
+reducedTerms_HDAC <- reduceSimMatrix(simMatrix_HDACi,
+                                scores,
+                                threshold=0.8,
+                                orgdb=org.Brassicanapus.eg.db)
+
+HS_toplot_MF = Stress_MF_all[Stress_MF_all$ID %in% reducedTerms_HDAC$parent,]
+
+p_MF_Stress = plotEnrich(HS_toplot_MF , plot_type="lollipop", up_color = "coral", down_color ="grey", scale_ratio = 0.03) + theme(panel.background = element_rect(fill="#FFFDE3"), panel.border = element_blank())
+
+
+row_MF_comp = ggarrange(p_MF_SAHA, p_MF_Stress, ncol=2, widths=c(3.5, 5))
+ggsave("C:\\Users\\naata\\Downloads\\ME_comparison_MF.svg", row_MF_comp, width=11, height=3.1)
+
+
+
+p_KEGG_S <- plotEnrichAdv(HDAC_Stress_KEGG_UP, HDAC_Stress_KEGG_DOWN[2:10,], stats_metric="p.adjust", term_metric = 'FoldEnrichment', plot_type = "one", xlim_left=-12.5, xlim_right = 12, color=c("#00A36C","coral")) + labs(caption = "KEGG") + theme(panel.background = element_rect(fill="#bae1ff"), panel.border = element_blank())
+
+
+p_KEGG_Stress <- plotEnrichAdv(Stress_KEGG_UP, Stress_KEGG_DOWN[2:5,], stats_metric="p.adjust", term_metric = 'FoldEnrichment', plot_type = "one", xlim_left=-11.2, xlim_right = 11, color=c("#00A36C","coral")) + labs(caption = "KEGG") + theme(panel.background = element_rect(fill="#bae1ff"), panel.border = element_blank())
+
+
+row_KEGG_comp = ggarrange(p_KEGG_S, p_KEGG_Stress, ncol=2, widths=c(5, 5), common.legend = TRUE, legend = "bottom")
+ggsave("C:\\Users\\naata\\Downloads\\ME_comparison_KEGG_2.svg", row_KEGG_comp, width=11, height=2.5)
+
+
+
+
+```
+
+
+
+# CC
+
+# All genes
+```{r}
+colnames(pathways_CC_gs)<-c("cc", "gene")
+
+# Get background genes : genes with detected minimal expression
+
+bckgr_geneset_HDAC <- merge(background_ALL_gl_HDAC, pathways_CC_gs, by="gene")
+bckgr_geneset_Stress <- merge(background_ALL_gl_Stress, pathways_CC_gs, by="gene")
+bckgr_geneset_HDAC_Stress <- merge(background_ALL_gl_HDAC_Stress, pathways_CC_gs, by="gene")
+
+colnames(bckgr_geneset_HDAC)<-c("ID","cc")
+bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
+colnames(bckgr_geneset_Stress)<-c("ID","cc")
+bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
+
+colnames(bckgr_geneset_HDAC_Stress)<-c("ID","cc")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+
+
+ORA_HDAC_CC <- clusterProfiler::enricher(gene = DEG_ALL_HDAC, minGSSize=2, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_CC_terms)
+ORA_Stress_CC <- clusterProfiler::enricher(gene = DEG_ALL_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_CC_terms)
+ORA_HDAC_Stress_CC <- clusterProfiler::enricher(gene = DEG_ALL_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC_Stress, TERM2NAME = pathways_CC_terms)
+
+
+
+ORA_HDAC_CC@organism="bnapus"
+ORA_HDAC_CC@ontology="CC"
+
+ORA_Stress_CC@organism="bnapus"
+ORA_Stress_CC@ontology="CC"
+
+ORA_HDAC_Stress_CC@organism="bnapus"
+ORA_HDAC_Stress_CC@ontology="CC"
+
+
+
+HDAC_CC_all <- importCP(ORA_HDAC_CC, type = "other")
+write_csv(HDAC_CC_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HDAC_ALL_CC_Results.csv")
+
+Stress_CC_all <- importCP(ORA_Stress_CC, type = "other")
+write_csv(Stress_CC_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_ALL_CC_Results.csv")
+
+HDAC_Stress_CC_all <- importCP(ORA_HDAC_Stress_CC, type = "other")
+write_csv(HDAC_Stress_CC_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_SAHA_ALL_CC_Results.csv")
+
+
+
+################## UP REGULATED GENES
+
+colnames(background_UP_gl_HDAC) = "gene"
+bckgr_geneset_HDAC <- merge(background_UP_gl_HDAC, pathways_CC_gs, by="gene")
+
+colnames(background_UP_gl_Stress) = "gene"
+bckgr_geneset_Stress <- merge(background_UP_gl_Stress, pathways_CC_gs, by="gene")
+
+colnames(background_UP_gl_HDAC_Stress) = "gene"
+bckgr_geneset_HDAC_Stress <- merge(background_UP_gl_HDAC_Stress, pathways_CC_gs, by="gene")
+
+
+colnames(bckgr_geneset_HDAC)<-c("ID","cc")
+bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
+colnames(bckgr_geneset_Stress)<-c("ID","cc")
+bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
+
+colnames(bckgr_geneset_HDAC_Stress)<-c("ID","cc")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+
+ORA_HDAC_CC_up <- clusterProfiler::enricher(gene = DEG_UP_HDAC, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_CC_terms)
+ORA_Stress_CC_up <- clusterProfiler::enricher(gene = DEG_UP_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_CC_terms)
+ORA_HDAC_Stress_CC_up <- clusterProfiler::enricher(gene = DEG_UP_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC_Stress, TERM2NAME = pathways_CC_terms)
+
+
+ORA_HDAC_CC_up@organism="bnapus"
+ORA_HDAC_CC_up@ontology="CC"
+
+ORA_Stress_CC_up@organism="bnapus"
+ORA_Stress_CC_up@ontology="CC"
+
+ORA_HDAC_Stress_CC_up@organism="bnapus"
+ORA_HDAC_Stress_CC_up@ontology="CC"
+
+
+
+HDAC_CC_UP <- importCP(ORA_HDAC_CC_up, type = "other")
+write_csv(HDAC_CC_UP, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_PE_SAHA_UP_CC_Results.csv")
+
+Stress_CC_UP <- importCP(ORA_Stress_CC_up, type = "other")
+write_csv(Stress_CC_UP, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_UP_CC_Results.csv")
+
+HDAC_Stress_CC_UP <- importCP(ORA_HDAC_Stress_CC_up, type = "other")
+write_csv(HDAC_Stress_CC_UP, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_SAHA_UP_CC_Results.csv")
+
+
+################# DOWN REGULATED GENES
+
+
+colnames(background_DOWN_gl_HDAC) = "gene"
+bckgr_geneset_HDAC <- merge(background_DOWN_gl_HDAC, pathways_CC_gs, by="gene")
+
+colnames(background_DOWN_gl_Stress) = "gene"
+bckgr_geneset_Stress <- merge(background_DOWN_gl_Stress, pathways_CC_gs, by="gene")
+
+colnames(background_DOWN_gl_HDAC_Stress) = "gene"
+bckgr_geneset_HDAC_Stress <- merge(background_DOWN_gl_HDAC_Stress, pathways_CC_gs, by="gene")
+
+
+colnames(bckgr_geneset_HDAC)<-c("ID","cc")
+bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
+colnames(bckgr_geneset_Stress)<-c("ID","cc")
+bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
+
+colnames(bckgr_geneset_HDAC_Stress)<-c("ID","cc")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+
+
+ORA_HDAC_CC_down <- clusterProfiler::enricher(gene = DEG_DOWN_HDAC, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_CC_terms)
+ORA_Stress_CC_down <- clusterProfiler::enricher(gene = DEG_DOWN_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_CC_terms)
+ORA_HDAC_Stress_CC_down <- clusterProfiler::enricher(gene = DEG_DOWN_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC_Stress, TERM2NAME = pathways_CC_terms)
+
+
+ORA_HDAC_CC_down@organism="bnapus"
+ORA_HDAC_CC_down@ontology="CC"
+
+ORA_Stress_CC_down@organism="bnapus"
+ORA_Stress_CC_down@ontology="CC"
+
+ORA_HDAC_Stress_CC_down@organism="bnapus"
+ORA_HDAC_Stress_CC_down@ontology="CC"
+
+
+HDAC_CC_DOWN <- importCP(ORA_HDAC_CC_down, type = "other")
+write_csv(HDAC_CC_DOWN, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_PE_SAHA_DOWN_CC_Results.csv")
+
+Stress_CC_DOWN <- importCP(ORA_Stress_CC_down, type = "other")
+write_csv(Stress_CC_DOWN, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_DOWN_CC_Results.csv")
+
+HDAC_Stress_CC_DOWN <- importCP(ORA_HDAC_Stress_CC_down, type = "other")
+write_csv(HDAC_Stress_CC_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_SAHA_DOWN_CC_Results.csv")
+
+
+
+```
+
+# MF
+
+# All genes
+```{r}
+colnames(pathways_MF_gs)<-c("mf", "gene")
+
+# Get background genes : genes with detected minimal expression
+
+bckgr_geneset_HDAC <- merge(background_ALL_gl_HDAC, pathways_MF_gs, by="gene")
+bckgr_geneset_Stress <- merge(background_ALL_gl_Stress, pathways_MF_gs, by="gene")
+bckgr_geneset_HDAC_Stress <- merge(background_ALL_gl_HDAC_Stress, pathways_MF_gs, by="gene")
+
+colnames(bckgr_geneset_HDAC)<-c("ID","mf")
+bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
+colnames(bckgr_geneset_Stress)<-c("ID","mf")
+bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
+
+colnames(bckgr_geneset_HDAC_Stress)<-c("ID","mf")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+
+
+ORA_HDAC_MF <- clusterProfiler::enricher(gene = DEG_ALL_HDAC, minGSSize=2, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_MF_terms)
+ORA_Stress_MF <- clusterProfiler::enricher(gene = DEG_ALL_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_MF_terms)
+ORA_HDAC_Stress_MF <- clusterProfiler::enricher(gene = DEG_ALL_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC_Stress, TERM2NAME = pathways_MF_terms)
+
+
+
+ORA_HDAC_MF@organism="bnapus"
+ORA_HDAC_MF@ontology="MF"
+
+ORA_Stress_MF@organism="bnapus"
+ORA_Stress_MF@ontology="MF"
+
+ORA_HDAC_Stress_MF@organism="bnapus"
+ORA_HDAC_Stress_MF@ontology="MF"
+
+
+
+HDAC_MF_all <- importCP(ORA_HDAC_MF, type = "other")
+write_csv(HDAC_MF_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HDAC_ALL_MF_Results.csv")
+
+Stress_MF_all <- importCP(ORA_Stress_MF, type = "other")
+write_csv(Stress_MF_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_ALL_MF_Results.csv")
+
+HDAC_Stress_MF_all <- importCP(ORA_HDAC_Stress_MF, type = "other")
+write_csv(HDAC_Stress_MF_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_SAHA_ALL_MF_Results.csv")
+
+
+
+################## UP REGULATED GENES
+
+colnames(background_UP_gl_HDAC) = "gene"
+bckgr_geneset_HDAC <- merge(background_UP_gl_HDAC, pathways_MF_gs, by="gene")
+
+colnames(background_UP_gl_Stress) = "gene"
+bckgr_geneset_Stress <- merge(background_UP_gl_Stress, pathways_MF_gs, by="gene")
+
+colnames(background_UP_gl_HDAC_Stress) = "gene"
+bckgr_geneset_HDAC_Stress <- merge(background_UP_gl_HDAC_Stress, pathways_MF_gs, by="gene")
+
+
+colnames(bckgr_geneset_HDAC)<-c("ID","mf")
+bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
+colnames(bckgr_geneset_Stress)<-c("ID","mf")
+bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
+
+colnames(bckgr_geneset_HDAC_Stress)<-c("ID","mf")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+
+ORA_HDAC_MF_up <- clusterProfiler::enricher(gene = DEG_UP_HDAC, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_MF_terms)
+ORA_Stress_MF_up <- clusterProfiler::enricher(gene = DEG_UP_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_MF_terms)
+ORA_HDAC_Stress_MF_up <- clusterProfiler::enricher(gene = DEG_UP_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC_Stress, TERM2NAME = pathways_MF_terms)
+
+
+ORA_HDAC_MF_up@organism="bnapus"
+ORA_HDAC_MF_up@ontology="MF"
+
+ORA_Stress_MF_up@organism="bnapus"
+ORA_Stress_MF_up@ontology="MF"
+
+ORA_HDAC_Stress_MF_up@organism="bnapus"
+ORA_HDAC_Stress_MF_up@ontology="MF"
+
+
+
+HDAC_MF_UP <- importCP(ORA_HDAC_MF_up, type = "other")
+write_csv(HDAC_MF_UP, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_PE_SAHA_UP_MF_Results.csv")
+
+Stress_MF_UP <- importCP(ORA_Stress_MF_up, type = "other")
+write_csv(Stress_MF_UP, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_UP_MF_Results.csv")
+
+HDAC_Stress_MF_UP <- importCP(ORA_HDAC_Stress_MF_up, type = "other")
+write_csv(HDAC_Stress_MF_UP, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_SAHA_UP_MF_Results.csv")
+
+
+################# DOWN REGULATED GENES
+
+
+colnames(background_DOWN_gl_HDAC) = "gene"
+bckgr_geneset_HDAC <- merge(background_DOWN_gl_HDAC, pathways_MF_gs, by="gene")
+
+colnames(background_DOWN_gl_Stress) = "gene"
+bckgr_geneset_Stress <- merge(background_DOWN_gl_Stress, pathways_MF_gs, by="gene")
+
+colnames(background_DOWN_gl_HDAC_Stress) = "gene"
+bckgr_geneset_HDAC_Stress <- merge(background_DOWN_gl_HDAC_Stress, pathways_MF_gs, by="gene")
+
+
+colnames(bckgr_geneset_HDAC)<-c("ID","mf")
+bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
+colnames(bckgr_geneset_Stress)<-c("ID","mf")
+bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
+
+colnames(bckgr_geneset_Stress)<-c("ID","mf")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+
+
+ORA_HDAC_MF_down <- clusterProfiler::enricher(gene = DEG_DOWN_HDAC, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_MF_terms)
+ORA_Stress_MF_down <- clusterProfiler::enricher(gene = DEG_DOWN_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_MF_terms)
+ORA_HDAC_Stress_MF_down <- clusterProfiler::enricher(gene = DEG_DOWN_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC_Stress, TERM2NAME = pathways_MF_terms)
+
+
+ORA_HDAC_MF_down@organism="bnapus"
+ORA_HDAC_MF_down@ontology="MF"
+
+ORA_Stress_MF_down@organism="bnapus"
+ORA_Stress_MF_down@ontology="MF"
+
+ORA_HDAC_Stress_MF_down@organism="bnapus"
+ORA_HDAC_Stress_MF_down@ontology="MF"
+
+
+HDAC_MF_DOWN <- importCP(ORA_HDAC_MF_down, type = "other")
+write_csv(HDAC_MF_DOWN, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_PE_SAHA_DOWN_MF_Results.csv")
+
+Stress_MF_DOWN <- importCP(ORA_Stress_MF_down, type = "other")
+write_csv(Stress_MF_DOWN, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_DOWN_MF_Results.csv")
+
+HDAC_Stress_MF_DOWN <- importCP(ORA_HDAC_Stress_MF_down, type = "other")
+write_csv(HDAC_Stress_MF_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_SAHA_DOWN_MF_Results.csv")
+
+
+```
+
+# KEGG
+
+# All genes
+```{r}
+colnames(pathways_KEGG_gs)<-c("bp", "gene")
+
+# Get background genes : genes with detected minimal expression
+
+bckgr_geneset_HDAC <- merge(background_ALL_gl_HDAC, pathways_KEGG_gs, by="gene")
+bckgr_geneset_Stress <- merge(background_ALL_gl_Stress, pathways_KEGG_gs, by="gene")
+bckgr_geneset_HDAC_Stress <- merge(background_ALL_gl_HDAC_Stress, pathways_KEGG_gs, by="gene")
+
+colnames(bckgr_geneset_HDAC)<-c("ID","bp")
+bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
+colnames(bckgr_geneset_Stress)<-c("ID","bp")
+bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
+
+colnames(bckgr_geneset_HDAC_Stress)<-c("ID","bp")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+
+
+ORA_HDAC_KEGG <- clusterProfiler::enricher(gene = DEG_ALL_HDAC, minGSSize=2, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_KEGG_terms)
+ORA_Stress_KEGG <- clusterProfiler::enricher(gene = DEG_ALL_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_KEGG_terms)
+ORA_HDAC_Stress_KEGG <- clusterProfiler::enricher(gene = DEG_ALL_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC_Stress, TERM2NAME = pathways_KEGG_terms)
+
+
+
+ORA_HDAC_KEGG@organism="bnapus"
+ORA_HDAC_KEGG@ontology="BP"
+
+ORA_Stress_KEGG@organism="bnapus"
+ORA_Stress_KEGG@ontology="BP"
+
+ORA_HDAC_Stress_KEGG@organism="bnapus"
+ORA_HDAC_Stress_KEGG@ontology="BP"
+
+
+
+HDAC_KEGG_all <- importCP(ORA_HDAC_KEGG, type = "other")
+write_csv(HDAC_KEGG_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HDAC_ALL_KEGG_Results.csv")
+
+Stress_KEGG_all <- importCP(ORA_Stress_KEGG, type = "other")
+write_csv(Stress_KEGG_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_ALL_KEGG_Results.csv")
+
+HDAC_Stress_KEGG_all <- importCP(ORA_HDAC_Stress_KEGG, type = "other")
+write_csv(HDAC_Stress_KEGG_all, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_SAHA_ALL_KEGG_Results.csv")
+
+
+
+################## UP REGULATED GENES
+
+bckgr_geneset_HDAC <- merge(background_UP_gl_HDAC, pathways_KEGG_gs, by="gene")
+bckgr_geneset_Stress <- merge(background_UP_gl_Stress, pathways_KEGG_gs, by="gene")
+bckgr_geneset_HDAC_Stress <- merge(background_UP_gl_HDAC_Stress, pathways_KEGG_gs, by="gene")
+
+colnames(bckgr_geneset_HDAC)<-c("ID","bp")
+bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
+colnames(bckgr_geneset_Stress)<-c("ID","bp")
+bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
+
+colnames(bckgr_geneset_HDAC_Stress)<-c("ID","bp")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+
+
+ORA_HDAC_KEGG_up <- clusterProfiler::enricher(gene = DEG_UP_HDAC, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_KEGG_terms)
+ORA_Stress_KEGG_up <- clusterProfiler::enricher(gene = DEG_UP_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_KEGG_terms)
+ORA_HDAC_Stress_KEGG_up <- clusterProfiler::enricher(gene = DEG_UP_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC_Stress, TERM2NAME = pathways_KEGG_terms)
+
+
+ORA_HDAC_KEGG_up@organism="bnapus"
+ORA_HDAC_KEGG_up@ontology="KEGG"
+
+ORA_Stress_KEGG_up@organism="bnapus"
+ORA_Stress_KEGG_up@ontology="KEGG"
+
+ORA_HDAC_Stress_KEGG_up@organism="bnapus"
+ORA_HDAC_Stress_KEGG_up@ontology="KEGG"
+
+
+
+HDAC_KEGG_UP <- importCP(ORA_HDAC_KEGG_up, type = "other")
+write_csv(HDAC_KEGG_UP, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_PE_SAHA_UP_KEGG_Results.csv")
+
+Stress_KEGG_UP <- importCP(ORA_Stress_KEGG_up, type = "other")
+write_csv(Stress_KEGG_UP, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_UP_KEGG_Results.csv")
+
+HDAC_Stress_KEGG_UP <- importCP(ORA_HDAC_Stress_KEGG_up, type = "other")
+write_csv(HDAC_Stress_KEGG_UP, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_SAHA_UP_KEGG_Results.csv")
+
+
+################# DOWN REGULATED GENES
+
+
+bckgr_geneset_HDAC <- merge(background_DOWN_gl_HDAC, pathways_KEGG_gs, by="gene")
+bckgr_geneset_Stress <- merge(background_DOWN_gl_Stress, pathways_KEGG_gs, by="gene")
+bckgr_geneset_HDAC_Stress <- merge(background_DOWN_gl_HDAC_Stress, pathways_KEGG_gs, by="gene")
+
+colnames(bckgr_geneset_HDAC)<-c("ID","bp")
+bckgr_geneset_HDAC<-bckgr_geneset_HDAC[,c(2,1)]
+
+colnames(bckgr_geneset_Stress)<-c("ID","bp")
+bckgr_geneset_Stress<-bckgr_geneset_Stress[,c(2,1)]
+
+colnames(bckgr_geneset_HDAC_Stress)<-c("ID","bp")
+bckgr_geneset_HDAC_Stress<-bckgr_geneset_HDAC_Stress[,c(2,1)]
+
+ORA_HDAC_KEGG_down <- clusterProfiler::enricher(gene = DEG_DOWN_HDAC, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_KEGG_terms)
+ORA_Stress_KEGG_down <- clusterProfiler::enricher(gene = DEG_DOWN_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_KEGG_terms)
+ORA_HDAC_Stress_KEGG_down <- clusterProfiler::enricher(gene = DEG_DOWN_HDAC_Stress, minGSSize=2, pvalueCutoff=0.05, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC_Stress, TERM2NAME = pathways_KEGG_terms)
+
+
+ORA_HDAC_KEGG_down@organism="bnapus"
+ORA_HDAC_KEGG_down@ontology="KEGG"
+
+ORA_Stress_KEGG_down@organism="bnapus"
+ORA_Stress_KEGG_down@ontology="KEGG"
+
+ORA_HDAC_Stress_KEGG_down@organism="bnapus"
+ORA_HDAC_Stress_KEGG_down@ontology="KEGG"
+
+
+HDAC_KEGG_DOWN <- importCP(ORA_HDAC_KEGG_down, type = "other")
+write_csv(HDAC_KEGG_DOWN, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_PE_SAHA_DOWN_KEGG_Results.csv")
+
+Stress_KEGG_DOWN <- importCP(ORA_Stress_KEGG_down, type = "other")
+write_csv(Stress_KEGG_DOWN, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_DOWN_KEGG_Results.csv")
+
+HDAC_Stress_KEGG_DOWN <- importCP(ORA_HDAC_Stress_KEGG_down, type = "other")
+write_csv(HDAC_Stress_KEGG_DOWN, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HeatStress_SAHA_DOWN_KEGG_Results.csv")
+
 ```
 
 Post processing output and calculating FoldEnrich and RichFactor output
 ```{r}
 
-ORA_HDAC_ALL = ORA_HDAC_ALL[,]
-ORA_Stress = ORA_Stress[,]
-
-calcratios<-function(x){vec_string<-as.integer(unlist(strsplit( x, split = "/")))
-                        vec_string[1] / vec_string[2]}
-
-##### HDAC
-
-generat_vector<-unlist(lapply(ORA_HDAC_ALL$GeneRatio,calcratios))
-bg_vector<-unlist(lapply(ORA_HDAC_ALL$BgRatio,calcratios))
-gcount_in_bg <- unlist(lapply(ORA_HDAC_ALL$BgRatio, function(x){vec_string<-as.integer(unlist(strsplit( x, split = "/")))
-                        vec_string[1]}))
-
-# Calculate ratios
-ORA_HDAC_ALL$GeneRatio<-generat_vector
-ORA_HDAC_ALL$BgRatio<-bg_vector
-
-# Add Fold Enrichment = GeneRatio /  BgRatio
-ORA_HDAC_ALL$FoldEnrich<-generat_vector/bg_vector
-  
-# Add rich factor = Gcount in set / Gcount in Bg
-ORA_HDAC_ALL$RichFactor<-ORA_HDAC_ALL$Count/gcount_in_bg
-
-
-##### STRESS
-generat_vector<-unlist(lapply(ORA_Stress$GeneRatio,calcratios))
-bg_vector<-unlist(lapply(ORA_Stress$BgRatio,calcratios))
-gcount_in_bg <- unlist(lapply(ORA_Stress$BgRatio, function(x){vec_string<-as.integer(unlist(strsplit( x, split = "/")))
-                        vec_string[1]}))
-# Calculate ratios
-ORA_Stress$GeneRatio<-generat_vector
-ORA_Stress$BgRatio<-bg_vector
-
-# Add Fold Enrichment = GeneRatio /  BgRatio
-ORA_Stress$FoldEnrich<-generat_vector/bg_vector
-
-# Add rich factor = Gcount in set / Gcount in Bg
-ORA_Stress$RichFactor<-ORA_Stress$Count/gcount_in_bg
-
-
-write_csv(ORA_Stress[,], "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_Stress_ALL_Results_CP.csv")
-write_csv(ORA_HDAC_ALL[,], "C:\\Users\\naata\\Documents\\MASTER\\TFM\\ORA_HDAC_ALL_Results_CP.csv")
-
-```
-
-
-Rrvigo Wang method semantic similarity calculation and plotting/clustering terms
-
-
-```{r}
-library("rrvgo")
-HDAC_sign<-ORA_HDAC_ALL[ORA_HDAC_ALL$p.adjust<0.05,]
-Stress_sign<-ORA_Stress[ORA_Stress$p.adjust<0.05,]
-
-##### HDACi
 # Calculate similarity matrix
-simMatrix_HDACi <- calculateSimMatrix(HDAC_sign$ID,
+simMatrix_HDACi <- calculateSimMatrix(HDAC_down$ID,
                                 orgdb=org.Brassicanapus.eg.db,
                                 ont="BP",
                                 method="Wang")
 # Reducing terms
-scores <- setNames(-log10(HDAC_sign$qvalue), HDAC_sign$ID)
+scores <- setNames(-log10(HDAC_down$qvalue), HDAC_down$ID)
 reducedTerms_HDAC <- reduceSimMatrix(simMatrix_HDACi,
                                 scores,
                                 threshold=0.7,
@@ -295,103 +1056,103 @@ reducedTerms_HDAC <- reduceSimMatrix(simMatrix_HDACi,
 ##### STRESS
 
 # Calculate similarity matrix
-simMatrix_Stress <- calculateSimMatrix(Stress_sign$ID,
+simMatrix_Stress <- calculateSimMatrix(Stress_down$ID,
                                 orgdb=org.Brassicanapus.eg.db,
                                 ont="BP",
                                 method="Wang")
 # Reducing terms
-scores <- setNames(-log10(Stress_sign$qvalue), Stress_sign$ID)
+scores <- setNames(-log10(Stress_down$qvalue), Stress_down$ID)
 reducedTerms_Stress <- reduceSimMatrix(simMatrix_Stress,
                                 scores,
                                 threshold=0.7,
                                 orgdb=org.Brassicanapus.eg.db)
-```
-# Similarity matrix
+colnames(HDAC_down) <- c("BN_BP_ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "geneID", "geneID_symbol", "Count", "FoldEnrich", "RichFactor")
+colnames(Stress_down) <- c("BN_BP_ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "geneID", "geneID_symbol", "Count", "FoldEnrich", "RichFactor")
 
-```{r}
 
-p1 <- heatmapPlot(simMatrix_HDACi,
-            reducedTerms_HDAC,
-            annotateParent=TRUE,
-            annotationLabel="parentTerm",
-            fontsize=6)
-p2 <- heatmapPlot(simMatrix_Stress,
-            reducedTerms_Stress,
-            annotateParent=TRUE,
-            annotationLabel="parentTerm",
-            fontsize=6)
-library(gridExtra)
-png(filename="C:\\Users\\naata\\Documents\\MASTER\\TFM\\cluster_ORA_HDAC.png", width=25,height=20, units="cm" ,res=300)
-p1
-dev.off()
+write.table(reducedTerms_HDAC, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\reduced_HDAC_down.tsv", row.names=FALSE, quote=FALSE, sep="\t")
+write.table(reducedTerms_Stress, "C:\\Users\\naata\\Documents\\MASTER\\TFM\\reduced_Stress_down.tsv", row.names=FALSE, quote=FALSE, sep="\t")
 
+ORA_HDAC_ALL = ORA_HDAC_ALL[,]
+ORA_Stress = ORA_Stress[,]
+
+HDAC_Stress_KEGG_UP[!(HDAC_Stress_KEGG_UP$ID %in% Stress_KEGG_UP$ID),]$ID
 ```
-```{r}
-p1<- treemapPlot(reducedTerms_HDAC)
-p2<- treemapPlot(reducedTerms_Stress)
-p2
-```
+
+
 
 
 ```{r}
-
-# scatterplot
-p1<- scatterPlot(simMatrix_HDACi, reducedTerms_HDAC, size="size", addLabel = TRUE)
-p2<- scatterPlot(simMatrix_Stress, reducedTerms_Stress, size="size", addLabel = TRUE)
-
-png(filename="C:\\Users\\naata\\Documents\\MASTER\\TFM\\scatterplot_ORA_HDAC.png", width=25,height=20, units="cm" ,res=300)
-grid
-dev.off()
-
+search_kegg_organism('bna', by='kegg_code')
 ```
 ```{r}
-
-p1<- wordcloudPlot(reducedTerms_HDAC, min.freq=1, colors="black")
-p2<- scatterPlot(simMatrix_Stress, reducedTerms_Stress, size="size", addLabel = TRUE)
-
-
-# wordcloud
-
-
+head(logFC)
+map_file=read.csv("C:\\Users\\naata\\Documents\\MASTER\\TFM\\bna_EID.csv")
+logFC_HDSAHAplot = merge(logFC_HDAC_Stress[,c(4,9)], map_file, by="external_gene_name")
 ```
-
-
 ```{r}
-
-genekitr::plotEnrich(go_easy, fold_change = listfc_HDAC, plot_type = "goheat", sim_method = "Wang", org = "bnapus", ont="BP")
-
-```
-
-
-
-# Up-regulated genes
-
-```{r}
-library("clusterProfiler")
-colnames(background_UP_gl_HDAC) = "gene"
-bckgr_geneset_HDAC <- merge(background_UP_gl_HDAC, pathways_BP_gs, by="gene")
-
-colnames(background_ALL_gl_Stress) = "gene"
-bckgr_geneset_Stress <- merge(background_UP_gl_Stress, pathways_BP_gs, by="gene")
-
-ORA_HDAC_UP <- clusterProfiler::enricher(geneList = DEG_UP_HDAC, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = ml_BP_GO, seed=TRUE, by="fgsea")
-ORA_Stress_UP <- clusterProfiler::enricher(geneList = DEG_UP_Stress, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = ml_BP_GO, seed=TRUE, by="fgsea")
-
+data(korg, package="pathview")
+korg[which(korg[,3] == "bna"),]
 
 ```
 
-# Down-regulated genes
 
-```{r}
-library("clusterProfiler")
-colnames(background_ALL_gl_HDAC) = "gene"
-bckgr_geneset_HDAC <- merge(background_DOWN_gl_HDAC, pathways_BP_gs, by="gene")
+```{r  pressure, echo=FALSE}
 
-colnames(background_ALL_gl_Stress) = "gene"
-bckgr_geneset_Stress <- merge(background_DOWN_gl_Stress, pathways_BP_gs, by="gene")
-
-ORA_HDAC_ALL <- clusterProfiler::enricher(geneList = DEG_DOWN_HDAC, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_HDAC, TERM2NAME = pathways_BP_terms, seed=TRUE, by="fgsea")
-ORA_Stress <- clusterProfiler::enricher(geneList = DEG_DOWN_Stress, minGSSize=2, eps=0.0, pvalueCutoff=1, pAdjustMethod="BH", gson=NULL, TERM2GENE = bckgr_geneset_Stress, TERM2NAME = pathways_BP_terms, seed=TRUE, by="fgsea")
+logFCv <- logFC_HDSAHAplot$log2FoldChange
+data_kegg <- logFC_HDSAHAplot[,c(3,2)]
+data_kegg=data_kegg[which(!duplicated(data_kegg[,1])),]
+#names(data_kegg) <- logFC$external_gene_name 
 
 
+
+data_final = t(data_final)
+names(data_final)=data_final[1,]
+
+
+
+pathview(gene.data = data_final,
+         pathway.id = "bna03410", 
+         species = "bna", # brassica napus KEGG accession 
+         limit = list(gene=5, cpd=1),
+         gene.idtype = "KEGG")
+
+pathview(gene.data = data_final,
+         pathway.id = "bna03410", 
+         species = "bna", # brassica napus KEGG accession 
+         limit = list(gene=5, cpd=1),
+         gene.idtype = "KEGG")
+
+pathview(gene.data = data_final,
+         pathway.id = "bna03430", 
+         species = "bna", # brassica napus KEGG accession 
+         limit = list(gene=5, cpd=1),
+         gene.idtype = "KEGG")
+
+logFC_HDSAHAplot = merge(logFC_Stress[,c(3,9)], map_file, by="external_gene_name")
+
+logFCv <- logFC_HDSAHAplot$log2FoldChange
+data_kegg <- logFC_HDSAHAplot[,c(3,2)]
+data_kegg=data_kegg[which(!duplicated(data_kegg[,1])),]
+#names(data_kegg) <- logFC$external_gene_name 
+
+
+
+data_final = t(data_final)
+names(data_final)=data_final[1,]
+
+
+
+pathview(gene.data = data_final,
+         pathway.id = "bna03440", 
+         species = "bna", # brassica napus KEGG accession 
+         limit = list(gene=5, cpd=1),
+         gene.idtype = "KEGG")
+
+pathview(gene.data = data_final,
+         pathway.id = "bna03008", 
+         species = "bna", # brassica napus KEGG accession 
+         limit = list(gene=5, cpd=1),
+         gene.idtype = "KEGG")
 ```
+
