@@ -43,7 +43,7 @@ mkdir QC_output/logs
 echo -e "\nPerforming QC and developing joint report..."
 
 for file in "$1"/*; do fastqc "$file" -o QC_output
-multiqc QC_output/*.zip 2>QC_output/logs
+multiqc QC_output/*.zip 2>QC_output/logs ; done 
 }
 
 
